@@ -1,9 +1,9 @@
 package com.mixfa.cptpredict;
 
-import com.mixfa.cptpredict.service.impl.VMBenchmarkerImpl;
 import com.vaadin.flow.component.page.AppShellConfigurator;
 import com.vaadin.flow.component.page.ColorScheme;
 import com.vaadin.flow.component.page.Push;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration;
 
@@ -103,8 +103,8 @@ public class CptpredictApplication implements AppShellConfigurator {
 //                .benchmarkSSH("172.26.89.33", "mixfa", "semnadcat", 22);
 
 //        var impl = new VMBenchmarkerImpl();
-//        System.out.println(impl.benchmarkLocalMachine());
-//        System.out.println(impl.benchmarkSSH("localhost", "mixfa", "semnadcat", 22));
-//        SpringApplication.run(CptpredictApplication.class, args);
+////        System.out.println(impl.benchmarkLocalMachine());
+////        System.out.println(impl.benchmarkSSH("localhost", "mixfa", "semnadcat", 22));run(CptpredictApplication.class, args);
+        SpringApplication.run(CptpredictApplication.class, args);
     }
 }

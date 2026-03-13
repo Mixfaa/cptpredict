@@ -26,10 +26,12 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.IntegerField;
+import com.vaadin.flow.component.textfield.PasswordField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.Route;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.function.FailableSupplier;
 import org.vaadin.addons.componentfactory.spinner.Spinner;
 
 import java.text.MessageFormat;
@@ -54,9 +56,9 @@ public class VMConfigManagerRoute extends BasicAppLayout {
     }
 
 
-    private Button makeBenchmarkButton(AtomicReference<VMBenchmarkResult> benchmarkResultRef) {
+    private Button makeBenchmarkButton(AtomicReference<VMBenchmarkResult> benchmarkResultRef, String btnText, FailableSupplier<VMBenchmarkResult, Exception> benchmarkFunction) {
         AtomicBoolean benchmarkStarted = new AtomicBoolean(false);
-        var benchmarkButton = new Button("Benchmark");
+        var benchmarkButton = new Button(btnText);
         benchmarkButton.addClickListener(_ -> {
             if (benchmarkStarted.get()) {
                 Utils.showNotification("Benchmarking already started");
@@ -80,7 +82,7 @@ public class VMConfigManagerRoute extends BasicAppLayout {
             {
                 try {
                     benchmarkStarted.set(true);
-                    benchmarkResultRef.set(vmBenchmarker.benchmarkLocalMachine());
+                    benchmarkResultRef.set(benchmarkFunction.get());
                     ui.access(() -> {
                         benchmarkButton.setIcon(VaadinIcon.CHECK_CIRCLE.create());
                         Utils.showNotification("Benchmark finished");
@@ -119,7 +121,36 @@ public class VMConfigManagerRoute extends BasicAppLayout {
                     var nameField = new TextField("Name");
                     dialogLayout.add(nameField);
                     var benchmarkResultRef = new AtomicReference<VMBenchmarkResult>();
-                    dialogLayout.add(makeBenchmarkButton(benchmarkResultRef));
+                    {
+                        var accordion = new Accordion();
+                        accordion.add("Benchmark local machine", new VerticalLayout(
+                                makeBenchmarkButton(benchmarkResultRef, "Benchmark localmachine", vmBenchmarker::benchmarkLocalMachine)
+                        ));
+
+                        accordion.add("Benchmark remote machine via SSH", new VerticalLayout() {{
+                            var userField = new TextField("Username");
+                            var hostField = new TextField("Host");
+                            var portField = new IntegerField("Port") {{
+                                setValue(22);
+                            }};
+                            var passwordField = new PasswordField("Password");
+
+                            add(userField, hostField, portField, passwordField);
+
+                            var button = makeBenchmarkButton(benchmarkResultRef, "Benchmark remote machine", () -> {
+                                var username = userField.getValue();
+                                var password = passwordField.getValue();
+                                var host = hostField.getValue();
+                                var port = portField.getValue();
+
+                                return vmBenchmarker.benchmarkSSH(host, username, password, port);
+                            });
+
+                            add(button);
+                        }});
+
+                        dialogLayout.add(new Details("Benchmarking", accordion));
+                    }
 
                     var pricingPolicyRef = new AtomicReference<PricingPolicy>();
                     {

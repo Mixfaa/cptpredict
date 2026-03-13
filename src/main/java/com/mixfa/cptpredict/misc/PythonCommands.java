@@ -27,7 +27,7 @@ public final class PythonCommands {
 
     public static String makeDir(String path) {
         return String.format(
-                "python -c \"import, shutil; shutil.rmtree('%s')\"",
+                "python -c \"import shutil; shutil.rmtree('%s')\"",
                 path
         );
     }
