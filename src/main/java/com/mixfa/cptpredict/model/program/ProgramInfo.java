@@ -16,6 +16,8 @@ public record ProgramInfo(
         ComplexityModel instructionModel,
         ComplexityModel cacheMissesModel,
         ComplexityModel dataReadModel,
-        List<ProgramTestInfo> programTests
+        ComplexityModel timeModel,
+        List<ProgramTestInfo> programTests,
+        List<ProgramStructureData> programStructureDataList // just to save input data, not used for any calculations
 ) {
 }

@@ -2,13 +2,15 @@ package com.mixfa.cptpredict.ui;
 
 import com.mixfa.cptpredict.misc.BigOAnalysis;
 import com.mixfa.cptpredict.model.VMConfig;
-import com.mixfa.cptpredict.model.program.ComplexityModel;
 import com.mixfa.cptpredict.model.program.ProgramInfo;
+import com.mixfa.cptpredict.model.program.ProgramStructureData;
 import com.mixfa.cptpredict.model.program.ProgramTestInfo;
+import com.mixfa.cptpredict.service.ProgramManagerService;
 import com.mixfa.cptpredict.service.repo.CustomizableRepo;
 import com.mixfa.cptpredict.service.repo.RepoHolder;
 import com.mixfa.cptpredict.ui.components.DialogCloseButton;
 import com.mixfa.cptpredict.ui.components.VmConfigCompRenderer;
+import com.mixfa.cptpredict.ui.misc.ComplexityModelsToText;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.accordion.Accordion;
 import com.vaadin.flow.component.button.Button;
@@ -26,17 +28,17 @@ import com.vaadin.flow.router.Route;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 @Route("/programs")
 public class ProgramsManagerRoute extends BasicAppLayout {
-    private final CustomizableRepo<ProgramInfo, String> appRepo;
+    private final ProgramManagerService programManagerService;
     private final CustomizableRepo<VMConfig, String> vmConfigRepo;
 
-    public ProgramsManagerRoute(RepoHolder repoHolder) {
-        this.appRepo = repoHolder.getRepository(ProgramInfo.class);
+    public ProgramsManagerRoute(RepoHolder repoHolder, ProgramManagerService programManagerService) {
+        this.programManagerService = programManagerService;
         this.vmConfigRepo = repoHolder.getRepository(VMConfig.class);
 
         setContent(makeContent());
@@ -45,21 +47,33 @@ public class ProgramsManagerRoute extends BasicAppLayout {
     record NTEnter(
             Component component,
             NumberField nField,
+            NumberField instrField,
+            NumberField cacheMissesField,
+            NumberField dataReadField,
             NumberField tField
     ) {
         public NTEnter(Consumer<NTEnter> onRemove) {
             var nField = new NumberField("n");
+            var instrField = new NumberField("Instructions");
+            var cacheMissesField = new NumberField("Cache misses");
+            var dataReadField = new NumberField("Data bytes read");
             var tField = new NumberField("t");
             var layout = new HorizontalLayout();
 
             this(
                     layout,
                     nField,
+                    instrField,
+                    cacheMissesField,
+                    dataReadField,
                     tField
             );
 
             layout.add(
                     nField,
+                    instrField,
+                    cacheMissesField,
+                    dataReadField,
                     tField,
                     new Button("remove", _ -> onRemove.accept(this))
             );
@@ -70,7 +84,11 @@ public class ProgramsManagerRoute extends BasicAppLayout {
         return new NTEnter(onRemove);
     }
 
-    private Dialog addAppDialog(Consumer<ProgramInfo> onSave, Optional<ProgramInfo> programInfo) {
+    interface ProgramInfoDataConsumer {
+        void accept(String name, String description, List<ProgramTestInfo> programTests, List<ProgramStructureData> programStructureDataList);
+    }
+
+    private Dialog addAppDialog(ProgramInfoDataConsumer onSave, Optional<ProgramInfo> programInfo) {
         var dialog = new Dialog();
         var layout = new VerticalLayout();
         dialog.setWidth("800px");
@@ -81,10 +99,8 @@ public class ProgramsManagerRoute extends BasicAppLayout {
         accordion.setWidthFull();
 
         var complexityAnalysisLayout = new VerticalLayout();
-        var complexityModelRef = new AtomicReference<ComplexityModel>();
-        programInfo.ifPresent(p -> complexityModelRef.set(p.model()));
+        var ntEnterComps = new ArrayList<NTEnter>();
         {
-            var ntEnterComps = new ArrayList<NTEnter>();
             var fields = new VerticalLayout();
 
             Consumer<NTEnter> onRemove = nt -> {
@@ -92,6 +108,18 @@ public class ProgramsManagerRoute extends BasicAppLayout {
                 fields.removeAll();
                 fields.add(ntEnterComps.stream().map(NTEnter::component).toList());
             };
+
+            programInfo.ifPresent(p -> {
+                for (var programStruct : p.programStructureDataList()) {
+                    var nt = new NTEnter(onRemove);
+                    nt.nField().setValue(programStruct.dataAmount());
+                    nt.instrField().setValue(programStruct.instructions());
+                    nt.tField().setValue(programStruct.timeInMs());
+                    nt.cacheMissesField().setValue(programStruct.cacheMisses());
+                    nt.dataReadField().setValue(programStruct.dataBytesRead());
+                    ntEnterComps.add(nt);
+                }
+            });
 
             var addNtEnterButton = new Button("add", _ -> {
                 ntEnterComps.add(new NTEnter(onRemove));
@@ -101,19 +129,26 @@ public class ProgramsManagerRoute extends BasicAppLayout {
 
             ntEnterComps.add(makeNTEnter(onRemove));
             fields.add(ntEnterComps.stream().map(NTEnter::component).toList());
-
             var complexityModelSpan = new Span();
-            var complexityModel = complexityModelRef.get();
-            if (complexityModel != null)
-                complexityModelSpan.setText(complexityModel.formula());
 
+            programInfo.ifPresent(p -> complexityModelSpan.setText(ComplexityModelsToText.apply(p)));
             var analyzeButton = new Button("analyze", _ -> {
                 var nList = ntEnterComps.stream().mapToDouble(nt -> nt.nField.getValue()).toArray();
+                var instrList = ntEnterComps.stream().mapToDouble(nt -> nt.instrField.getValue()).toArray();
                 var tList = ntEnterComps.stream().mapToDouble(nt -> nt.tField.getValue()).toArray();
+                var cList = ntEnterComps.stream().mapToDouble(nt -> nt.cacheMissesField.getValue()).toArray();
+                var dtList = ntEnterComps.stream().mapToDouble(nt -> nt.dataReadField.getValue()).toArray();
 
-                complexityModelRef.set(BigOAnalysis.analyze(nList, tList));
+                var instCmplxModel = BigOAnalysis.analyze(nList, instrList);
+                var cacheCmplxModel = BigOAnalysis.analyze(nList, cList);
+                var dataBytesCmplxModel = BigOAnalysis.analyze(nList, dtList);
+                var timeCmplxModel = BigOAnalysis.analyze(nList, tList);
 
-                complexityModelSpan.setText(complexityModelRef.get().formula());
+                complexityModelSpan.setText(
+                        ComplexityModelsToText.apply(
+                                instCmplxModel, cacheCmplxModel, dataBytesCmplxModel, timeCmplxModel
+                        )
+                );
             });
 
             complexityAnalysisLayout.add(addNtEnterButton, fields, analyzeButton, complexityModelSpan);
@@ -212,7 +247,6 @@ public class ProgramsManagerRoute extends BasicAppLayout {
             var name = nameField.getValue();
             var description = descriptionField.getValue();
 
-            var complexityModel = complexityModelRef.get();
 
             if (StringUtils.isBlank(name)) {
                 Notification.show("Enter name");
@@ -222,12 +256,15 @@ public class ProgramsManagerRoute extends BasicAppLayout {
                 Notification.show("Enter description");
                 return;
             }
-            if (complexityModel == null) {
-                Notification.show("Perform complexity analysis");
-                return;
-            }
 
-            onSave.accept(new ProgramInfo(name, description, complexityModel, programTestInfoList));
+            var programStructDataList = ntEnterComps.stream().map(
+                    nt -> new ProgramStructureData(
+                            nt.nField.getValue(),
+                            nt.instrField.getValue(),
+                            nt.cacheMissesField.getValue(),
+                            nt.dataReadField.getValue(),
+                            nt.tField.getValue())).toList();
+            onSave.accept(name, description, programTestInfoList, programStructDataList);
             Notification.show("Program " + name + " saved");
         });
 
@@ -241,31 +278,31 @@ public class ProgramsManagerRoute extends BasicAppLayout {
     private Component makeContent() {
         var layout = new VerticalLayout();
 
-        if (vmConfigRepo.isStub() || appRepo.isStub()) {
+        if (vmConfigRepo.isStub()) {
             layout.add(new Span("Connect to database first"));
             return layout;
         }
 
         var appGrid = new Grid<>(ProgramInfo.class, false);
-        var addAppDialog = addAppDialog(p -> {
-            appRepo.save(p);
-            appGrid.setItems(appRepo.findAll());
+        var addAppDialog = addAppDialog((name, description, programTests, programStructureDataList) -> {
+            programManagerService.save(name, description, programTests, programStructureDataList);
+            appGrid.setItems(programManagerService.findAll());
         }, Optional.empty());
         var addAppConfigButton = new Button("Add app config", _ -> addAppDialog.open());
         appGrid.addColumn(ProgramInfo::name).setHeader("Name");
         appGrid.addColumn(ProgramInfo::description).setHeader("Name");
-        appGrid.addColumn(p -> p.model().formula()).setHeader("Model");
-        appGrid.addComponentColumn(p -> new Button(VaadinIcon.COG.create(), _ -> addAppDialog(edited -> {
-            appRepo.delete(p);
-            appRepo.save(edited);
-            appGrid.setItems(appRepo.findAll());
+        appGrid.addColumn(ComplexityModelsToText::apply).setHeader("Model");
+        appGrid.addComponentColumn(p -> new Button(VaadinIcon.COG.create(), _ -> addAppDialog((name, description, programTests, programStructureDataList) -> {
+            programManagerService.delete(p);
+            programManagerService.save(name, description, programTests, programStructureDataList);
+            appGrid.setItems(programManagerService.findAll());
         }, Optional.of(p)).open()));
         appGrid.addComponentColumn(p -> new Button(VaadinIcon.CLOSE_CIRCLE.create(), _ -> {
-            appRepo.delete(p);
-            appGrid.setItems(appRepo.findAll());
+            programManagerService.delete(p);
+            appGrid.setItems(programManagerService.findAll());
         }));
 
-        appGrid.setItems(appRepo.findAll());
+        appGrid.setItems(programManagerService.findAll());
         layout.add(addAppConfigButton, appGrid);
 
         return layout;
