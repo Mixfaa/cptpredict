@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -139,7 +140,7 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
         var osArch = commandExecutor.executeCommand(PythonCommands.getOsArchCmd())
                 .toLowerCase().trim().split(":");
         if (osArch.length != 2)
-            throw new RuntimeException("Invalid OS arch result: " + osArch);
+            throw new RuntimeException("Invalid OS arch result: " + Arrays.toString(osArch));
         return Pair.of(osArch[0], osArch[1]);
     }
 

@@ -13,7 +13,9 @@ import java.util.List;
 public record ProgramInfo(
         @org.dizitart.no2.repository.annotations.Id @Id String name,
         String description,
-        ComplexityModel model,
+        ComplexityModel instructionModel,
+        ComplexityModel cacheMissesModel,
+        ComplexityModel dataReadModel,
         List<ProgramTestInfo> programTests
 ) {
 }
