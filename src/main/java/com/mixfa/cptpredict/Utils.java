@@ -13,4 +13,10 @@ final public class Utils {
     public static void showErrorNotification(Throwable e) {
         Notification.show(e.getMessage());
     }
+
+    public static double map(
+            double min, double max, double rangeMin, double rangeMax, double value
+    ) {
+        return (value - min) * (rangeMax - rangeMin) / (max - min) + rangeMin;
+    }
 }

@@ -105,6 +105,12 @@ public class CptpredictApplication implements AppShellConfigurator {
 //        var impl = new VMBenchmarkerImpl();
 ////        System.out.println(impl.benchmarkLocalMachine());
 ////        System.out.println(impl.benchmarkSSH("localhost", "mixfa", "semnadcat", 22));run(CptpredictApplication.class, args);
+//        System.out.println(
+//                Utils.map(0.0, 10.0,
+//                        100.0, 200.0,
+//                        5.0
+//                )
+//        );
         SpringApplication.run(CptpredictApplication.class, args);
     }
 }

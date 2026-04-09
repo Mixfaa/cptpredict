@@ -50,6 +50,17 @@ public record ComplexityModel(
         };
     }
 
+    public double growthRate() {
+        final var nGrowth = 100;
+
+        var totalGrowth = 0.0;
+        var func = this.getFunction();
+        for (int i = 1; i < nGrowth; i++)
+            totalGrowth += func.applyAsDouble(i);
+
+        return totalGrowth / (double) nGrowth;
+    }
+
     public DoubleUnaryOperator getFunction() {
         final var model = getModel(type);
         return n -> model.value(n, c, b);

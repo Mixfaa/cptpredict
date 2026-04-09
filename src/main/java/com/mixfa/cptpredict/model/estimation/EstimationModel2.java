@@ -1,9 +1,11 @@
 package com.mixfa.cptpredict.model.estimation;
 
+import com.mixfa.cptpredict.Utils;
 import com.mixfa.cptpredict.model.VMBenchmarkResult;
 import com.mixfa.cptpredict.model.VMConfig;
-import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
 import com.mixfa.cptpredict.model.benchmark.BenchmarkAppResult;
+import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
+import com.mixfa.cptpredict.model.program.ComplexityModel;
 import com.mixfa.cptpredict.model.program.ProgramInfo;
 import org.apache.commons.numbers.core.Precision;
 
@@ -27,12 +29,48 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
         return "EstimationModel2";
     }
 
+    private static Map<IPCBenchmarkApp.Type, Double> calculateWeights(
+            ComplexityModel instructionModel,
+            ComplexityModel cacheMissesModel,
+            ComplexityModel dataReadModel
+    ) {
+        var instrGrowthRate = instructionModel.growthRate();
+        var cacheMissesGrowthRate = cacheMissesModel.growthRate();
+        var dataReadGrowthRate = dataReadModel.growthRate();
+
+        var maxGrowth = Math.max(
+                instrGrowthRate,
+                Math.max(cacheMissesGrowthRate, dataReadGrowthRate)
+        );
+
+        var minGrowth = Math.min(
+                instrGrowthRate,
+                Math.min(cacheMissesGrowthRate, dataReadGrowthRate)
+        );
+
+        return Map.of(
+                IPCBenchmarkApp.Type.CPU, Utils.map(0.0, 1.0, minGrowth, maxGrowth, instrGrowthRate),
+                IPCBenchmarkApp.Type.RAM, Utils.map(0.0, 1.0, minGrowth, maxGrowth, cacheMissesGrowthRate),
+                IPCBenchmarkApp.Type.DISK, Utils.map(0.0, 1.0, minGrowth, maxGrowth, dataReadGrowthRate)
+
+        );
+    }
+
     @Override
     public EstimationResult estimate(VMConfig vmConfig, Parameters parameters) {
         var targetMachineBenchmarkResult = vmConfig.benchmarkResult();
         var targetMachineFreqKhz = targetMachineBenchmarkResult.efficientFreqKhz()[parameters.targetMachineCore]; // hz to c per ms
 
-        var appIpc = parameters.ipcCalculator.calculate(
+        // WEIGHTED IPC CALCULATOR SUBSTITUTED
+        var weightedCalculator = new IpcCalculator.WeightedIpcCalculator(
+                calculateWeights(
+                        parameters.programInfo.instructionModel(),
+                        parameters.programInfo.cacheMissesModel(),
+                        parameters.programInfo.dataReadModel()
+                )
+        );
+
+        var appIpc = weightedCalculator.calculate(
                 parameters.testMachineResult,
                 vmConfig.benchmarkResult(),
                 parameters.testMachineCore,
@@ -40,7 +78,7 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
                 parameters.testMachineAppIpc
         );
 
-        var appComplexityFunc = parameters.programInfo.model().getFunction();
+        var appComplexityFunc = parameters.programInfo.instructionModel().getFunction();
 
         var instructions = appComplexityFunc.applyAsDouble(parameters.appIterations);
 
