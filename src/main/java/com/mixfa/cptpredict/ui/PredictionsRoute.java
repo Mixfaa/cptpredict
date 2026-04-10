@@ -53,11 +53,10 @@ public class PredictionsRoute extends BasicAppLayout {
                 var dataAmountField = new IntegerField("Data amount (N)");
                 dataAmountField.setMin(1);
 
-
                 var getResultsButton = new Button("Get results", _ -> {
                     var testResult = testIpcSelect.getValue();
 
-                    var ipcCalculator = EstimationModel2.IpcCalculator.DefaultIpcCalculator.getInstance();
+                    var weightedIpcCalculator = EstimationModel2.IpcCalculator.WeightedIpcCalculator.calculateWeightsFromComplexityModels(programInfo);
 
                     var results = vmConfigs.stream().map(vmConfig -> {
                         var params = new EstimationModel2.Parameters(
@@ -65,7 +64,7 @@ public class PredictionsRoute extends BasicAppLayout {
                                 testResult.vmBenchmarkResult(),
                                 testResult.vmBenchmarkResult().highestFreqCore(),
                                 vmConfig.benchmarkResult().highestFreqCore(),
-                                ipcCalculator,
+                                weightedIpcCalculator,
                                 testResult.appIpc(),
                                 dataAmountField.getValue()
                         );
