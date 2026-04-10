@@ -57,8 +57,17 @@ public class ProgramsManagerRoute extends BasicAppLayout {
             var instrField = new NumberField("Instructions");
             var cacheMissesField = new NumberField("Cache misses");
             var dataReadField = new NumberField("Data bytes read");
-            var tField = new NumberField("t");
-            var layout = new HorizontalLayout();
+            var tField = new NumberField("time in ms");
+            var layout = new HorizontalLayout() {{
+                setWidthFull();
+            }};
+
+            var fields = List.of(nField, instrField, cacheMissesField, dataReadField, tField);
+            fields.forEach(field -> {
+                field.setMinWidth("0");
+                field.setWidth("100%");
+                field.getElement().getStyle().set("flex-shrink", "1");
+            });
 
             this(
                     layout,
@@ -91,7 +100,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
     private Dialog addAppDialog(ProgramInfoDataConsumer onSave, Optional<ProgramInfo> programInfo) {
         var dialog = new Dialog();
         var layout = new VerticalLayout();
-        dialog.setWidth("800px");
+        dialog.setWidth("1100px");
         dialog.setHeight("800px");
         dialog.setHeaderTitle("Add program configuration");
 
@@ -239,7 +248,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
             addTestsLayout.add(vmSelect, nField, timeInput, ipcSpan, setBtn, testsGrid);
         }
 
-        accordion.add("Basic data", basicDataLayout);
+        accordion.add("Name and descriptions", basicDataLayout);
         accordion.add("Complexity analysis", complexityAnalysisLayout);
         accordion.add("Add tests data", addTestsLayout);
 
