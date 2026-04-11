@@ -56,7 +56,7 @@ public class PredictionsRoute extends BasicAppLayout {
                 var getResultsButton = new Button("Get results", _ -> {
                     var testResult = testIpcSelect.getValue();
 
-                    var weightedIpcCalculator = EstimationModel2.IpcCalculator.WeightedIpcCalculator.calculateWeightsFromComplexityModels(programInfo);
+                    var weightedIpcCalculator = new EstimationModel2.IpcCalculator.WeightedIpcCalculator(programInfo.calculateWeights());
 
                     var results = vmConfigs.stream().map(vmConfig -> {
                         var params = new EstimationModel2.Parameters(

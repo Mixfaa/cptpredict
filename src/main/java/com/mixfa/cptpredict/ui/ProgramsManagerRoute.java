@@ -2,8 +2,9 @@ package com.mixfa.cptpredict.ui;
 
 import com.mixfa.cptpredict.misc.BigOAnalysis;
 import com.mixfa.cptpredict.model.VMConfig;
+import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
 import com.mixfa.cptpredict.model.program.ProgramInfo;
-import com.mixfa.cptpredict.model.program.ProgramStructureData;
+import com.mixfa.cptpredict.model.program.ProgramStructureDataRecord;
 import com.mixfa.cptpredict.model.program.ProgramTestInfo;
 import com.mixfa.cptpredict.service.ProgramManagerService;
 import com.mixfa.cptpredict.service.repo.CustomizableRepo;
@@ -94,7 +95,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
     }
 
     interface ProgramInfoDataConsumer {
-        void accept(String name, String description, List<ProgramTestInfo> programTests, List<ProgramStructureData> programStructureDataList);
+        void accept(String name, String description, List<ProgramTestInfo> programTests, List<ProgramStructureDataRecord> programStructureDataList);
     }
 
     private Dialog addAppDialog(ProgramInfoDataConsumer onSave, Optional<ProgramInfo> programInfo) {
@@ -267,7 +268,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
             }
 
             var programStructDataList = ntEnterComps.stream().map(
-                    nt -> new ProgramStructureData(
+                    nt -> new ProgramStructureDataRecord(
                             nt.nField.getValue(),
                             nt.instrField.getValue(),
                             nt.cacheMissesField.getValue(),
@@ -301,15 +302,22 @@ public class ProgramsManagerRoute extends BasicAppLayout {
         appGrid.addColumn(ProgramInfo::name).setHeader("Name");
         appGrid.addColumn(ProgramInfo::description).setHeader("Name");
         appGrid.addColumn(ComplexityModelsToText::apply).setHeader("Model");
+        appGrid.addColumn(programInfo -> {
+            var weights = programInfo.calculateWeights();
+            return String.format("CPU: %.3f\nRAM: %.3f\nDISK: %.3f",
+                    weights.get(IPCBenchmarkApp.Type.CPU),
+                    weights.get(IPCBenchmarkApp.Type.RAM),
+                    weights.get(IPCBenchmarkApp.Type.DISK));
+        }).setHeader("Dependencies weights");
         appGrid.addComponentColumn(p -> new Button(VaadinIcon.COG.create(), _ -> addAppDialog((name, description, programTests, programStructureDataList) -> {
             programManagerService.delete(p);
             programManagerService.save(name, description, programTests, programStructureDataList);
             appGrid.setItems(programManagerService.findAll());
-        }, Optional.of(p)).open()));
+        }, Optional.of(p)).open())).setHeader("Edit");
         appGrid.addComponentColumn(p -> new Button(VaadinIcon.CLOSE_CIRCLE.create(), _ -> {
             programManagerService.delete(p);
             appGrid.setItems(programManagerService.findAll());
-        }));
+        })).setHeader("Delete");
 
         appGrid.setItems(programManagerService.findAll());
         layout.add(addAppConfigButton, appGrid);

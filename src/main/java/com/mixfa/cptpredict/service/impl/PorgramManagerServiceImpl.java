@@ -2,7 +2,7 @@ package com.mixfa.cptpredict.service.impl;
 
 import com.mixfa.cptpredict.misc.BigOAnalysis;
 import com.mixfa.cptpredict.model.program.ProgramInfo;
-import com.mixfa.cptpredict.model.program.ProgramStructureData;
+import com.mixfa.cptpredict.model.program.ProgramStructureDataRecord;
 import com.mixfa.cptpredict.model.program.ProgramTestInfo;
 import com.mixfa.cptpredict.service.ProgramManagerService;
 import com.mixfa.cptpredict.service.repo.CustomizableRepo;
@@ -20,27 +20,27 @@ public class PorgramManagerServiceImpl implements ProgramManagerService {
     }
 
     @Override
-    public ProgramInfo save(String name, String description, List<ProgramTestInfo> programTests, List<ProgramStructureData> programStructureDataList) {
-        var dataAmountArray = programStructureDataList.stream().mapToDouble(ProgramStructureData::dataAmount).toArray();
+    public ProgramInfo save(String name, String description, List<ProgramTestInfo> programTests, List<ProgramStructureDataRecord> programStructureDataList) {
+        var dataAmountArray = programStructureDataList.stream().mapToDouble(ProgramStructureDataRecord::dataAmount).toArray();
 
         var instructionsComplxModel = BigOAnalysis.analyze(
                 dataAmountArray,
-                programStructureDataList.stream().mapToDouble(ProgramStructureData::instructions).toArray()
+                programStructureDataList.stream().mapToDouble(ProgramStructureDataRecord::instructions).toArray()
         );
 
         var cacheMissesComplxModel = BigOAnalysis.analyze(
                 dataAmountArray,
-                programStructureDataList.stream().mapToDouble(ProgramStructureData::cacheMisses).toArray()
+                programStructureDataList.stream().mapToDouble(ProgramStructureDataRecord::cacheMisses).toArray()
         );
 
         var dataReadComplxModel = BigOAnalysis.analyze(
                 dataAmountArray,
-                programStructureDataList.stream().mapToDouble(ProgramStructureData::dataBytesRead).toArray()
+                programStructureDataList.stream().mapToDouble(ProgramStructureDataRecord::dataBytesRead).toArray()
         );
 
         var timeComplxModel = BigOAnalysis.analyze(
                 dataAmountArray,
-                programStructureDataList.stream().mapToDouble(ProgramStructureData::timeInMs).toArray()
+                programStructureDataList.stream().mapToDouble(ProgramStructureDataRecord::timeInMs).toArray()
         );
 
         return programRepo.save(new ProgramInfo(name, description, instructionsComplxModel, cacheMissesComplxModel, dataReadComplxModel, timeComplxModel, programTests, programStructureDataList));

@@ -1,7 +1,7 @@
 package com.mixfa.cptpredict.service;
 
 import com.mixfa.cptpredict.model.program.ProgramInfo;
-import com.mixfa.cptpredict.model.program.ProgramStructureData;
+import com.mixfa.cptpredict.model.program.ProgramStructureDataRecord;
 import com.mixfa.cptpredict.model.program.ProgramTestInfo;
 
 import java.util.List;
@@ -11,7 +11,7 @@ public interface ProgramManagerService {
             String name,
             String description,
             List<ProgramTestInfo> programTests,
-            List<ProgramStructureData> programStructureDataList
+            List<ProgramStructureDataRecord> programStructureDataList
     );
 
     void delete(ProgramInfo programInfo);

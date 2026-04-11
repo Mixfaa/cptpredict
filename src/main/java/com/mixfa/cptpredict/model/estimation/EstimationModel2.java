@@ -29,7 +29,6 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
         return "EstimationModel2";
     }
 
-
     @Override
     public EstimationResult estimate(VMConfig vmConfig, Parameters parameters) {
         var targetMachineBenchmarkResult = vmConfig.benchmarkResult();
@@ -100,50 +99,6 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
         record WeightedIpcCalculator(
                 Map<IPCBenchmarkApp.Type, Double> weight
         ) implements IpcCalculator {
-            public static WeightedIpcCalculator calculateWeightsFromComplexityModels(ProgramInfo programInfo) {
-                return calculateWeightsFromComplexityModels(programInfo.instructionModel(), programInfo.cacheMissesModel(), programInfo.dataReadModel());
-            }
-
-            public static WeightedIpcCalculator calculateWeightsFromComplexityModels(
-                    ComplexityModel instructionModel,
-                    ComplexityModel cacheMissesModel,
-                    ComplexityModel dataReadModel
-            ) {
-                return new IpcCalculator.WeightedIpcCalculator(
-                        calculateWeights(
-                                instructionModel,
-                                cacheMissesModel,
-                                dataReadModel
-                        )
-                );
-            }
-
-            private static Map<IPCBenchmarkApp.Type, Double> calculateWeights(
-                    ComplexityModel instructionModel,
-                    ComplexityModel cacheMissesModel,
-                    ComplexityModel dataReadModel
-            ) {
-                var instrGrowthRate = instructionModel.growthRate();
-                var cacheMissesGrowthRate = cacheMissesModel.growthRate();
-                var dataReadGrowthRate = dataReadModel.growthRate();
-
-                var maxGrowth = Math.max(
-                        instrGrowthRate,
-                        Math.max(cacheMissesGrowthRate, dataReadGrowthRate)
-                );
-
-                var minGrowth = Math.min(
-                        instrGrowthRate,
-                        Math.min(cacheMissesGrowthRate, dataReadGrowthRate)
-                );
-
-                return Map.of(
-                        IPCBenchmarkApp.Type.CPU, Utils.map(0.0, 1.0, minGrowth, maxGrowth, instrGrowthRate),
-                        IPCBenchmarkApp.Type.RAM, Utils.map(0.0, 1.0, minGrowth, maxGrowth, cacheMissesGrowthRate),
-                        IPCBenchmarkApp.Type.DISK, Utils.map(0.0, 1.0, minGrowth, maxGrowth, dataReadGrowthRate)
-                );
-            }
-
             public double calcAvgIpc(VMBenchmarkResult vmBenchmarkResult, int core) {
                 var coreFreqKhz = vmBenchmarkResult.efficientFreqKhz()[core];
                 return Arrays.stream(vmBenchmarkResult.benchmarkResults())

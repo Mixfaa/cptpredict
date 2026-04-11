@@ -4,6 +4,7 @@ import com.mixfa.cptpredict.Utils;
 import com.mixfa.cptpredict.model.VMBenchmarkResult;
 import com.mixfa.cptpredict.model.VMConfig;
 import com.mixfa.cptpredict.model.benchmark.BenchmarkAppResult;
+import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
 import com.mixfa.cptpredict.model.finance.Money;
 import com.mixfa.cptpredict.model.pricingPolicy.PricingPolicy;
 import com.mixfa.cptpredict.model.pricingPolicy.ReservedPricingPolicy;
@@ -216,6 +217,9 @@ public class VMConfigManagerRoute extends BasicAppLayout {
         vmConfigGrid.setSizeFull();
         vmConfigGrid.addColumn(VMConfig::name).setHeader("Name");
         vmConfigGrid.addColumn(vmConfig -> vmConfig.benchmarkResult().cpuName()).setHeader("CPU");
+        vmConfigGrid.addColumn(vmConfig -> String.format("%.4f", vmConfig.benchmarkResult().avgIPC(IPCBenchmarkApp.Type.CPU))).setHeader("CPU IPC");
+        vmConfigGrid.addColumn(vmConfig -> String.format("%.4f", vmConfig.benchmarkResult().avgIPC(IPCBenchmarkApp.Type.RAM))).setHeader("RAM IPC");
+        vmConfigGrid.addColumn(vmConfig -> String.format("%.6f", vmConfig.benchmarkResult().avgIPC(IPCBenchmarkApp.Type.DISK))).setHeader("DISK I/O IPC");
         vmConfigGrid.addColumn(vmConfig -> vmConfig.pricingPolicy().getClass().getSimpleName()).setHeader("Pricing policy");
         vmConfigGrid.addComponentColumn(vmConfig -> new Button(VaadinIcon.COG.create(), _ -> {
             openInfoDialog(vmConfig);
