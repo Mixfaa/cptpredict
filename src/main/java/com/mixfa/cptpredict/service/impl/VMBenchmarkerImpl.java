@@ -3,8 +3,8 @@ package com.mixfa.cptpredict.service.impl;
 import com.mixfa.cptpredict.misc.CommandExecutor;
 import com.mixfa.cptpredict.misc.PythonCommands;
 import com.mixfa.cptpredict.model.VMBenchmarkResult;
-import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
 import com.mixfa.cptpredict.model.benchmark.BenchmarkAppResult;
+import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
 import com.mixfa.cptpredict.service.VMBenchmarker;
 import dev.toonformat.jtoon.JToon;
 import org.apache.sshd.client.SshClient;
@@ -29,15 +29,15 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
     private static final String BENCHMARKS_DIR_GLOBAL = "benchmarks/";
 
     private static final List<IPCBenchmarkApp> BENCHMARKS = List.of(
-            new IPCBenchmarkApp("ipc_bench1", IPCBenchmarkApp.Type.CPU, 1928782494.0),
-            new IPCBenchmarkApp("ipc_bench2", IPCBenchmarkApp.Type.CPU, 985741224.0),
-            new IPCBenchmarkApp("ipc_bench3", IPCBenchmarkApp.Type.CPU, 372669835.0),
-            new IPCBenchmarkApp("ipc_bench4", IPCBenchmarkApp.Type.RAM, 426443077.0),
-            new IPCBenchmarkApp("ipc_bench5", IPCBenchmarkApp.Type.RAM, 964814892.0),
-            new IPCBenchmarkApp("ipc_bench6", IPCBenchmarkApp.Type.RAM, 906415201.0),
-            new IPCBenchmarkApp("ipc_bench7", IPCBenchmarkApp.Type.RAM, 369553777.0),
-            new IPCBenchmarkApp("ipc_bench8", IPCBenchmarkApp.Type.DISK, 2675410.0),
-            new IPCBenchmarkApp("ipc_bench9", IPCBenchmarkApp.Type.DISK, 121301200.0)
+            new IPCBenchmarkApp("ipc_bench1", IPCBenchmarkApp.Type.CPU, 1928780825.0),
+            new IPCBenchmarkApp("ipc_bench2", IPCBenchmarkApp.Type.CPU, 1079624486.0),
+            new IPCBenchmarkApp("ipc_bench3", IPCBenchmarkApp.Type.CPU, 376873292.0),
+            new IPCBenchmarkApp("ipc_bench4", IPCBenchmarkApp.Type.RAM, 430637811.0),
+            new IPCBenchmarkApp("ipc_bench5", IPCBenchmarkApp.Type.RAM, 964820848.0),
+            new IPCBenchmarkApp("ipc_bench6", IPCBenchmarkApp.Type.RAM, 906423998.0),
+            new IPCBenchmarkApp("ipc_bench7", IPCBenchmarkApp.Type.RAM, 369553639.0),
+            new IPCBenchmarkApp("ipc_bench8", IPCBenchmarkApp.Type.DISK, 1075630815.0),
+            new IPCBenchmarkApp("ipc_bench9", IPCBenchmarkApp.Type.DISK, 122437223.0)
     );
 
     private static final String FREQ_BENCHMARK_WIN_AMD64 = "freq-benchmark-x86_64-pc-windows-gnu.exe";
@@ -178,7 +178,7 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
                 var scpClientCreator = ScpClientCreator.instance();
                 var scpClient = scpClientCreator.createScpClient(session);
 
-                final var tempDir = "~/tempdir/";
+                final var tempDir = "tempdir/";
 
                 session.executeRemoteCommand(PythonCommands.removeDir(tempDir));
                 session.executeRemoteCommand(PythonCommands.makeDir(tempDir));
@@ -191,9 +191,9 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
                         session.executeRemoteCommand("chmod +x " + remotePath);
                 }
 
+                var results = benchmarkMachine(processExecutor, tempDir);
                 session.executeRemoteCommand(PythonCommands.removeDir(tempDir));
-
-                return benchmarkMachine(processExecutor, tempDir);
+                return results;
             } finally {
                 client.stop();
             }

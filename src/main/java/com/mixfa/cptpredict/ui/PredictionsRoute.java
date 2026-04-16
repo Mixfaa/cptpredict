@@ -4,6 +4,7 @@ import com.mixfa.cptpredict.model.VMConfig;
 import com.mixfa.cptpredict.model.estimation.EstimationModel;
 import com.mixfa.cptpredict.model.estimation.EstimationModel2;
 import com.mixfa.cptpredict.model.estimation.EstimationResult;
+import com.mixfa.cptpredict.model.program.ComplexityModel;
 import com.mixfa.cptpredict.model.program.ProgramInfo;
 import com.mixfa.cptpredict.model.program.ProgramTestInfo;
 import com.mixfa.cptpredict.service.EstimationModelManager;
@@ -56,7 +57,7 @@ public class PredictionsRoute extends BasicAppLayout {
                 var getResultsButton = new Button("Get results", _ -> {
                     var testResult = testIpcSelect.getValue();
 
-                    var weightedIpcCalculator = new EstimationModel2.IpcCalculator.WeightedIpcCalculator(programInfo.calculateWeights());
+                    var weightedIpcCalculator = new EstimationModel2.IpcCalculator.WeightedIpcCalculator(programInfo.calculateWeights(ComplexityModel::growthRate));
 
                     var results = vmConfigs.stream().map(vmConfig -> {
                         var params = new EstimationModel2.Parameters(

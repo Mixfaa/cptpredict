@@ -3,6 +3,7 @@ package com.mixfa.cptpredict.ui;
 import com.mixfa.cptpredict.misc.BigOAnalysis;
 import com.mixfa.cptpredict.model.VMConfig;
 import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
+import com.mixfa.cptpredict.model.program.ComplexityModel;
 import com.mixfa.cptpredict.model.program.ProgramInfo;
 import com.mixfa.cptpredict.model.program.ProgramStructureDataRecord;
 import com.mixfa.cptpredict.model.program.ProgramTestInfo;
@@ -303,7 +304,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
         appGrid.addColumn(ProgramInfo::description).setHeader("Name");
         appGrid.addColumn(ComplexityModelsToText::apply).setHeader("Model");
         appGrid.addColumn(programInfo -> {
-            var weights = programInfo.calculateWeights();
+            var weights = programInfo.calculateWeights(ComplexityModel::growthRate);
             return String.format("CPU: %.3f\nRAM: %.3f\nDISK: %.3f",
                     weights.get(IPCBenchmarkApp.Type.CPU),
                     weights.get(IPCBenchmarkApp.Type.RAM),

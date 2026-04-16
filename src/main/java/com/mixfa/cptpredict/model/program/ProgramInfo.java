@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.ToDoubleFunction;
 
 @Document
 @Entity
@@ -25,10 +26,10 @@ public record ProgramInfo(
 // just to save input data, not used for any calculations
 ) {
     // to see what app is using more
-    public Map<IPCBenchmarkApp.Type, Double> calculateWeights() {
-        var instrGrowthRate = instructionModel.growthRate();
-        var cacheMissesGrowthRate = cacheMissesModel.growthRate();
-        var dataReadGrowthRate = dataReadModel.growthRate();
+    public Map<IPCBenchmarkApp.Type, Double> calculateWeights(ToDoubleFunction<ComplexityModel> weightFunction) {
+        var instrGrowthRate = weightFunction.applyAsDouble(instructionModel);
+        var cacheMissesGrowthRate = weightFunction.applyAsDouble(cacheMissesModel);
+        var dataReadGrowthRate = weightFunction.applyAsDouble(dataReadModel);
 
         var maxGrowth = Math.max(
                 instrGrowthRate,

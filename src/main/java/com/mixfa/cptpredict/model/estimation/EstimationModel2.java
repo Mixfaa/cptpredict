@@ -1,11 +1,8 @@
 package com.mixfa.cptpredict.model.estimation;
 
-import com.mixfa.cptpredict.Utils;
 import com.mixfa.cptpredict.model.VMBenchmarkResult;
 import com.mixfa.cptpredict.model.VMConfig;
-import com.mixfa.cptpredict.model.benchmark.BenchmarkAppResult;
 import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
-import com.mixfa.cptpredict.model.program.ComplexityModel;
 import com.mixfa.cptpredict.model.program.ProgramInfo;
 import org.apache.commons.numbers.core.Precision;
 
