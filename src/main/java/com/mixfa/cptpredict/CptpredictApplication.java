@@ -111,6 +111,11 @@ public class CptpredictApplication implements AppShellConfigurator {
 //                        5.0
 //                )
 //        );
+//        var a = new ProcessBuilder().command("python", "--version").start();
+//
+//
+//        a.waitFor();
+//        System.out.println(new String(a.getInputStream().readAllBytes()));
         SpringApplication.run(CptpredictApplication.class, args);
     }
 }

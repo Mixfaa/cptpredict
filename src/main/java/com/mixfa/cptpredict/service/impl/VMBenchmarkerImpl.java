@@ -29,17 +29,16 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
     private static final String BENCHMARKS_DIR_GLOBAL = "benchmarks/";
 
     private static final List<IPCBenchmarkApp> BENCHMARKS = List.of(
-            new IPCBenchmarkApp("ipc_bench1", IPCBenchmarkApp.Type.CPU, 1928780825.0),
-            new IPCBenchmarkApp("ipc_bench2", IPCBenchmarkApp.Type.CPU, 1079624486.0),
-            new IPCBenchmarkApp("ipc_bench3", IPCBenchmarkApp.Type.CPU, 376873292.0),
-            new IPCBenchmarkApp("ipc_bench4", IPCBenchmarkApp.Type.RAM, 430637811.0),
-            new IPCBenchmarkApp("ipc_bench5", IPCBenchmarkApp.Type.RAM, 964820848.0),
-            new IPCBenchmarkApp("ipc_bench6", IPCBenchmarkApp.Type.RAM, 906423998.0),
-            new IPCBenchmarkApp("ipc_bench7", IPCBenchmarkApp.Type.RAM, 369553639.0),
-            new IPCBenchmarkApp("ipc_bench8", IPCBenchmarkApp.Type.DISK, 1075630815.0),
-            new IPCBenchmarkApp("ipc_bench9", IPCBenchmarkApp.Type.DISK, 122437223.0)
+            new IPCBenchmarkApp("ipc_bench1", IPCBenchmarkApp.Type.CPU, 1928781526.0),
+            new IPCBenchmarkApp("ipc_bench2", IPCBenchmarkApp.Type.CPU, 1079630843.0),
+            new IPCBenchmarkApp("ipc_bench3", IPCBenchmarkApp.Type.CPU, 376867483.0),
+            new IPCBenchmarkApp("ipc_bench4", IPCBenchmarkApp.Type.RAM, 430641355.0),
+            new IPCBenchmarkApp("ipc_bench5", IPCBenchmarkApp.Type.RAM, 964817679.0),
+            new IPCBenchmarkApp("ipc_bench6", IPCBenchmarkApp.Type.RAM, 906423229.0),
+            new IPCBenchmarkApp("ipc_bench7", IPCBenchmarkApp.Type.RAM, 369551169.0),
+            new IPCBenchmarkApp("ipc_bench8", IPCBenchmarkApp.Type.DISK, 1075633690.0),
+            new IPCBenchmarkApp("ipc_bench9", IPCBenchmarkApp.Type.DISK, 122440839.0)
     );
-
     private static final String FREQ_BENCHMARK_WIN_AMD64 = "freq-benchmark-x86_64-pc-windows-gnu.exe";
     private static final String FREQ_BENCHMARK_WIN_ARM64 = "freq-benchmark-aarch64-pc-windows-gnullvm.exe";
     private static final String FREQ_BENCHMARK_LINUX_AMD64 = "freq-benchmark-x86_64-unknown-linux-gnu";
@@ -77,8 +76,8 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
         throw new RuntimeException("Unsupported OS or Arch: " + os + " " + arch);
     }
 
-    public static String getCpuName(boolean isLinux, CommandExecutor commandExecutor) throws Exception {
-        var cmd = isLinux ? PythonCommands.getCpuNameLinux() : PythonCommands.getCpuNameWindows();
+    public static String getCpuName(boolean isLinux, PythonCommands pythonCommands, CommandExecutor commandExecutor) throws Exception {
+        var cmd = isLinux ? pythonCommands.getCpuNameLinux() : pythonCommands.getCpuNameWindows();
         return commandExecutor.executeCommand(cmd);
     }
 
@@ -97,13 +96,13 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
         return Double.parseDouble(output);
     }
 
-    private static VMBenchmarkResult benchmarkMachine(CommandExecutor commandExecutor, String benchmarksDir) throws Exception {
-        var osArch = getOsArchSSH(commandExecutor);
+    private static VMBenchmarkResult benchmarkMachine(CommandExecutor commandExecutor, PythonCommands pythonCommands, String benchmarksDir) throws Exception {
+        var osArch = getOsArchSSH(pythonCommands, commandExecutor);
 
         var os = osArch.getFirst();
         var arch = osArch.getSecond();
 
-        var cpuName = getCpuName(isLinux(os), commandExecutor);
+        var cpuName = getCpuName(isLinux(os), pythonCommands, commandExecutor);
 
         var freqData = runBenchmarkOld(benchmarksDir + freqBenchmarkByOsArch(os, arch), commandExecutor);
 
@@ -121,9 +120,14 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
         for (int i = 0; i < BENCHMARKS.size(); i++) {
             var benchmark = BENCHMARKS.get(i);
 
-            var time = runIpcBenchmark(benchmark, os, arch, commandExecutor, benchmarksDir);
-            if (time == 0) time = 1; // are you running on nuke?
-            var instrPerMs = benchmark.testedInstructions() / time;
+            var bestTime = Double.MAX_VALUE;
+            for (int j = 0; j < 5; j++) {
+                var time = runIpcBenchmark(benchmark, os, arch, commandExecutor, benchmarksDir);
+                if (time < bestTime)
+                    bestTime = time;
+            }
+            if (bestTime == 0) bestTime = 1; // are you running on nuke?
+            var instrPerMs = benchmark.testedInstructions() / bestTime;
 
             results[i] = new BenchmarkAppResult(benchmark, instrPerMs);
         }
@@ -133,11 +137,12 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
     @Override
     public VMBenchmarkResult benchmarkLocalMachine() throws Exception {
         var processExecutor = CommandExecutor.LocalMachineExecutor.instance();
-        return benchmarkMachine(processExecutor, BENCHMARKS_DIR);
+        var pythonCommands = PythonCommands.tryCreate(processExecutor);
+        return benchmarkMachine(processExecutor, pythonCommands, BENCHMARKS_DIR);
     }
 
-    private static Pair<String, String> getOsArchSSH(CommandExecutor commandExecutor) throws Exception {
-        var osArch = commandExecutor.executeCommand(PythonCommands.getOsArchCmd())
+    private static Pair<String, String> getOsArchSSH(PythonCommands pythonCommands, CommandExecutor commandExecutor) throws Exception {
+        var osArch = commandExecutor.executeCommand(pythonCommands.getOsArchCmd())
                 .toLowerCase().trim().split(":");
         if (osArch.length != 2)
             throw new RuntimeException("Invalid OS arch result: " + Arrays.toString(osArch));
@@ -164,13 +169,11 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
                 session.auth().verify(10, TimeUnit.SECONDS);
 
                 var processExecutor = new CommandExecutor.SSHSessionExecutor(session);
+                var pythonCommands = PythonCommands.tryCreate(processExecutor);
 
-                var osArch = getOsArchSSH(processExecutor);
+                var osArch = getOsArchSSH(pythonCommands, processExecutor);
                 var os = osArch.getFirst();
                 var arch = osArch.getSecond();
-
-                System.out.println(os);
-                System.out.println(arch);
 
                 var listOfFiles = makeBenchmarksList(os, arch);
 
@@ -180,20 +183,24 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
 
                 final var tempDir = "tempdir/";
 
-                session.executeRemoteCommand(PythonCommands.removeDir(tempDir));
-                session.executeRemoteCommand(PythonCommands.makeDir(tempDir));
+                try {
+                    session.executeRemoteCommand(pythonCommands.removeDir(tempDir));
+                    session.executeRemoteCommand(pythonCommands.makeDir(tempDir));
 
-                for (var filepath : listOfFiles) {
-                    var remotePath = tempDir + filepath.getFileName().toString();
-                    scpClient.upload(filepath, remotePath, ScpClient.Option.PreserveAttributes);
+                    for (var filepath : listOfFiles) {
+                        var remotePath = tempDir + filepath.getFileName().toString();
+                        scpClient.upload(filepath, remotePath, ScpClient.Option.PreserveAttributes);
 
-                    if (isLinux(os))
-                        session.executeRemoteCommand("chmod +x " + remotePath);
+                        if (isLinux(os))
+                            session.executeRemoteCommand("chmod +x " + remotePath);
+                    }
+
+                    return benchmarkMachine(processExecutor, pythonCommands, tempDir);
+                } catch (Exception e) {
+                    throw e;
+                } finally {
+                    session.executeRemoteCommand(pythonCommands.removeDir(tempDir));
                 }
-
-                var results = benchmarkMachine(processExecutor, tempDir);
-                session.executeRemoteCommand(PythonCommands.removeDir(tempDir));
-                return results;
             } finally {
                 client.stop();
             }

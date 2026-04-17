@@ -269,6 +269,7 @@ public class VMConfigManagerRoute extends BasicAppLayout {
             var benchmarksGrid = new Grid<>(BenchmarkAppResult.class, false);
             benchmarksGrid.addColumn(b -> b.app().executableName()).setHeader("Benchmark");
             benchmarksGrid.addColumn(b -> b.app().type()).setHeader("Type");
+            benchmarksGrid.addColumn(b -> String.format("%.3f", b.app().testedInstructions() / b.instrPerMs())).setHeader("Time in ms");
             benchmarksGrid.addColumn(b -> String.format("%.3f", b.instrPerMs())).setHeader("Instr Per ms");
             benchmarksGrid.addColumn(b -> String.format("%.5f", b.instrPerMs() / maxCoreFreq)).setHeader("IPC");
 
