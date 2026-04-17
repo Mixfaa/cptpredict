@@ -2,6 +2,7 @@ package com.mixfa.cptpredict.model.estimation;
 
 import com.mixfa.cptpredict.model.VMBenchmarkResult;
 import com.mixfa.cptpredict.model.VMConfig;
+import com.mixfa.cptpredict.model.benchmark.BenchmarkAppResult;
 import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
 import com.mixfa.cptpredict.model.program.ProgramInfo;
 import org.apache.commons.numbers.core.Precision;
@@ -41,7 +42,7 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
 
         var appComplexityFunc = parameters.programInfo.instructionModel().getFunction();
 
-        var instructions = appComplexityFunc.applyAsDouble(parameters.appIterations);
+        var instructions = appComplexityFunc.applyAsDouble(parameters.dataAmount);
 
         var time = (long) (instructions / (targetMachineFreqKhz * appIpc));
 
@@ -66,32 +67,32 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
                 double testMachineAppIpc
         );
 
-//        class DefaultIpcCalculator implements IpcCalculator {
-//            private static final DefaultIpcCalculator INSTANCE = new DefaultIpcCalculator();
-//
-//            public static DefaultIpcCalculator getInstance() {
-//                return INSTANCE;
-//            }
-//
-//            private DefaultIpcCalculator() {
-//            }
-//
-//            public static double calcAvgIpc(VMBenchmarkResult vmBenchmarkResult, int core) {
-//                var coreFreqkhz = vmBenchmarkResult.efficientFreqKhz()[core];
-//                return Arrays.stream(vmBenchmarkResult.benchmarkResults())
-//                        .mapToDouble(BenchmarkAppResult::instrPerMs)
-//                        .map(it -> it / coreFreqkhz)
-//                        .average().getAsDouble();
-//            }
-//
-//            @Override
-//            public double calculate(VMBenchmarkResult testMachine, VMBenchmarkResult targetMachine, int testMachineCore, int targetMachineCore, double testMachineAppIpc) {
-//                var testMachineIpc = calcAvgIpc(testMachine, testMachineCore);
-//                var targetMachineIpc = calcAvgIpc(targetMachine, targetMachineCore);
-//
-//                return (targetMachineIpc * testMachineAppIpc) / testMachineIpc;
-//            }
-//        }
+        class DefaultIpcCalculator implements IpcCalculator {
+            private static final DefaultIpcCalculator INSTANCE = new DefaultIpcCalculator();
+
+            public static DefaultIpcCalculator getInstance() {
+                return INSTANCE;
+            }
+
+            private DefaultIpcCalculator() {
+            }
+
+            public static double calcAvgIpc(VMBenchmarkResult vmBenchmarkResult, int core) {
+                var coreFreqkhz = vmBenchmarkResult.efficientFreqKhz()[core];
+                return Arrays.stream(vmBenchmarkResult.benchmarkResults())
+                        .mapToDouble(BenchmarkAppResult::instrPerMs)
+                        .map(it -> it / coreFreqkhz)
+                        .average().getAsDouble();
+            }
+
+            @Override
+            public double calculate(VMBenchmarkResult testMachine, VMBenchmarkResult targetMachine, int testMachineCore, int targetMachineCore, double testMachineAppIpc) {
+                var testMachineIpc = calcAvgIpc(testMachine, testMachineCore);
+                var targetMachineIpc = calcAvgIpc(targetMachine, targetMachineCore);
+
+                return (targetMachineIpc * testMachineAppIpc) / testMachineIpc;
+            }
+        }
 
         record WeightedIpcCalculator(
                 Map<IPCBenchmarkApp.Type, Double> weight
@@ -121,7 +122,7 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
             int targetMachineCore,
             IpcCalculator ipcCalculator,
             double testMachineAppIpc,
-            long appIterations
+            long dataAmount
     ) {
     }
 }

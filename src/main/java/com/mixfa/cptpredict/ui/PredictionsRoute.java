@@ -51,6 +51,8 @@ public class PredictionsRoute extends BasicAppLayout {
                 testIpcSelect.setItems(programInfo.programTests());
                 testIpcSelect.setItemLabelGenerator(ProgramTestInfo::toString);
 
+//                var avgTestAppIpc = programInfo.programTests().stream().mapToDouble(ProgramTestInfo::appIpc).average().getAsDouble();
+
                 var dataAmountField = new IntegerField("Data amount (N)");
                 dataAmountField.setMin(1);
 
@@ -58,6 +60,7 @@ public class PredictionsRoute extends BasicAppLayout {
                     var testResult = testIpcSelect.getValue();
 
                     var weightedIpcCalculator = new EstimationModel2.IpcCalculator.WeightedIpcCalculator(programInfo.calculateWeights(ComplexityModel::growthRate));
+//                    var calculator = EstimationModel2.IpcCalculator.DefaultIpcCalculator.getInstance();
 
                     var results = vmConfigs.stream().map(vmConfig -> {
                         var params = new EstimationModel2.Parameters(

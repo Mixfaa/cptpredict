@@ -69,6 +69,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
                 field.setMinWidth("0");
                 field.setWidth("100%");
                 field.getElement().getStyle().set("flex-shrink", "1");
+                field.setValue(0.0);
             });
 
             this(
@@ -109,6 +110,15 @@ public class ProgramsManagerRoute extends BasicAppLayout {
         var accordion = new Accordion();
         accordion.setWidthFull();
 
+        var programStructDataList = new ArrayList<ProgramStructureDataRecord>();
+        var programTestInfoList = new ArrayList<ProgramTestInfo>();
+        programInfo.ifPresent(programTestInfo -> {
+            programStructDataList.addAll(programTestInfo.programStructureDataList());
+            programTestInfoList.addAll(programTestInfo.programTests());
+        });
+
+        var testsGrid = new Grid<>(ProgramTestInfo.class, false);
+
         var complexityAnalysisLayout = new VerticalLayout();
         var ntEnterComps = new ArrayList<NTEnter>();
         {
@@ -138,12 +148,11 @@ public class ProgramsManagerRoute extends BasicAppLayout {
                 fields.add(ntEnterComps.stream().map(NTEnter::component).toList());
             });
 
-            ntEnterComps.add(makeNTEnter(onRemove));
             fields.add(ntEnterComps.stream().map(NTEnter::component).toList());
             var complexityModelSpan = new Span();
 
             programInfo.ifPresent(p -> complexityModelSpan.setText(ComplexityModelsToText.apply(p)));
-            var analyzeButton = new Button("analyze", _ -> {
+            var analyzeButton = new Button("analyze and set", _ -> {
                 var nList = ntEnterComps.stream().mapToDouble(nt -> nt.nField.getValue()).toArray();
                 var instrList = ntEnterComps.stream().mapToDouble(nt -> nt.instrField.getValue()).toArray();
                 var tList = ntEnterComps.stream().mapToDouble(nt -> nt.tField.getValue()).toArray();
@@ -160,9 +169,39 @@ public class ProgramsManagerRoute extends BasicAppLayout {
                                 instCmplxModel, cacheCmplxModel, dataBytesCmplxModel, timeCmplxModel
                         )
                 );
+
+                programStructDataList.clear();
+                programStructDataList.addAll(
+                        ntEnterComps.stream().map(
+                                nt -> new ProgramStructureDataRecord(
+                                        nt.nField.getValue(),
+                                        nt.instrField.getValue(),
+                                        nt.cacheMissesField.getValue(),
+                                        nt.dataReadField.getValue(),
+                                        nt.tField.getValue())).toList()
+                );
             });
 
-            complexityAnalysisLayout.add(addNtEnterButton, fields, analyzeButton, complexityModelSpan);
+            var vmSelect = new Select<VMConfig>("Select Vm Configuration");
+            vmSelect.setRenderer(VmConfigCompRenderer.getInstance());
+            vmSelect.setItems(vmConfigRepo.findAll());
+
+            var addForVMButton = new Button("Add tests for VM", _ -> {
+                var vmConfig = vmSelect.getValue();
+                for (ProgramStructureDataRecord programStructureDataRecord : programStructDataList) {
+                    var coreFreqKhz = vmConfig.benchmarkResult().efficientFreqKhz()[vmConfig.benchmarkResult().highestFreqCore()];
+                    var ipc = (programStructureDataRecord.instructions() / programStructureDataRecord.timeInMs()) / coreFreqKhz;
+
+                    programTestInfoList.add(new ProgramTestInfo(
+                            vmConfig.benchmarkResult(),
+                            ipc
+                    ));
+                }
+
+                testsGrid.setItems(programTestInfoList);
+            });
+
+            complexityAnalysisLayout.add(addNtEnterButton, fields, analyzeButton, complexityModelSpan, vmSelect, addForVMButton);
         }
 
         var basicDataLayout = new VerticalLayout();
@@ -175,45 +214,44 @@ public class ProgramsManagerRoute extends BasicAppLayout {
         var addTestsLayout = new VerticalLayout() {{
             setWidthFull();
         }};
-        var programTestInfoList = new ArrayList<ProgramTestInfo>();
+
         programInfo.ifPresent(p -> {
             nameField.setValue(p.name());
             descriptionField.setValue(p.description());
             programTestInfoList.addAll(p.programTests());
         });
         {
-            var nField = new NumberField("Data amount (N)") {{
-                setMin(1.0);
-            }};
-            var timeInput = new NumberField("Time required (in milliseconds)") {{
-                setMin(1.0);
-            }};
+//            var nField = new NumberField("Data amount (N)") {{
+//                setMin(1.0);
+//            }};
+//            var timeInput = new NumberField("Time required (in milliseconds)") {{
+//                setMin(1.0);
+//            }};
 
-            var ipcSpan = new Span("IPC: ");
+//            var ipcSpan = new Span("IPC: ");
 
-            var vmSelect = new Select<VMConfig>("Select VM Configuration");
-            vmSelect.setRenderer(VmConfigCompRenderer.getInstance());
-            vmSelect.setItems(vmConfigRepo.findAll());
+//            var vmSelect = new Select<VMConfig>("Select VM Configuration");
+//            vmSelect.setRenderer(VmConfigCompRenderer.getInstance());
+//            vmSelect.setItems(vmConfigRepo.findAll());
 
-            Runnable onEdited = () -> {
-                var n = nField.getValue();
-                var t = timeInput.getValue();
-                var vmConfig = vmSelect.getValue();
+//            Runnable onEdited = () -> {
+//                var n = nField.getValue();
+//                var t = timeInput.getValue();
+//                var vmConfig = vmSelect.getValue();
+//
+//                if (n == null || t == null || vmConfig == null) {
+//                    return;
+//                }
+//
+//                var coreFreqKhz = vmConfig.benchmarkResult().efficientFreqKhz()[vmConfig.benchmarkResult().highestFreqCore()];
+//                var ipc = (n / t) / coreFreqKhz;
+//
+//                ipcSpan.setText("IPC: " + ipc);
+//            };
 
-                if (n == null || t == null || vmConfig == null) {
-                    return;
-                }
+//            nField.addValueChangeListener(_ -> onEdited.run());
+//            timeInput.addValueChangeListener(_ -> onEdited.run());
 
-                var coreFreqKhz = vmConfig.benchmarkResult().efficientFreqKhz()[vmConfig.benchmarkResult().highestFreqCore()];
-                var ipc = (n / t) / coreFreqKhz;
-
-                ipcSpan.setText("IPC: " + ipc);
-            };
-
-            nField.addValueChangeListener(_ -> onEdited.run());
-            timeInput.addValueChangeListener(_ -> onEdited.run());
-
-            var testsGrid = new Grid<>(ProgramTestInfo.class, false);
             testsGrid.setItems(programTestInfoList);
             testsGrid.setWidthFull();
             testsGrid.addColumn(info -> info.vmBenchmarkResult().cpuName()).setHeader("CPU");
@@ -222,32 +260,33 @@ public class ProgramsManagerRoute extends BasicAppLayout {
                 programTestInfoList.remove(info);
                 testsGrid.setItems(programTestInfoList);
             }));
-            var setBtn = new Button("add", _ -> {
-                var vmConfig = vmSelect.getValue();
-                if (vmConfig == null) {
-                    Notification.show("Select vm configuration");
-                    return;
-                }
+//            var setBtn = new Button("add", _ -> {
+//                var vmConfig = vmSelect.getValue();
+//                if (vmConfig == null) {
+//                    Notification.show("Select vm configuration");
+//                    return;
+//                }
+//
+//                var n = nField.getValue();
+//                var t = timeInput.getValue();
+//
+//                if (n == null || t == null) {
+//                    Notification.show("Enter data amount and time required (in ms)");
+//                    return;
+//                }
+//                var coreFreqKhz = vmConfig.benchmarkResult().efficientFreqKhz()[vmConfig.benchmarkResult().highestFreqCore()];
+//                var ipc = (n / t) / coreFreqKhz;
+//
+//                programTestInfoList.add(new ProgramTestInfo(
+//                        vmConfig.benchmarkResult(),
+//                        ipc
+//                ));
+//                testsGrid.setItems(programTestInfoList);
+//                Notification.show("Result added");
+//            });
 
-                var n = nField.getValue();
-                var t = timeInput.getValue();
-
-                if (n == null || t == null) {
-                    Notification.show("Enter data amount and time required (in ms)");
-                    return;
-                }
-                var coreFreqKhz = vmConfig.benchmarkResult().efficientFreqKhz()[vmConfig.benchmarkResult().highestFreqCore()];
-                var ipc = (n / t) / coreFreqKhz;
-
-                programTestInfoList.add(new ProgramTestInfo(
-                        vmConfig.benchmarkResult(),
-                        ipc
-                ));
-                testsGrid.setItems(programTestInfoList);
-                Notification.show("Result added");
-            });
-
-            addTestsLayout.add(vmSelect, nField, timeInput, ipcSpan, setBtn, testsGrid);
+//            addTestsLayout.add(vmSelect, nField, timeInput, ipcSpan, setBtn, testsGrid);
+            addTestsLayout.add(testsGrid);
         }
 
         accordion.add("Name and descriptions", basicDataLayout);
@@ -258,25 +297,12 @@ public class ProgramsManagerRoute extends BasicAppLayout {
             var name = nameField.getValue();
             var description = descriptionField.getValue();
 
-
             if (StringUtils.isBlank(name)) {
                 Notification.show("Enter name");
                 return;
             }
-            if (StringUtils.isBlank(description)) {
-                Notification.show("Enter description");
-                return;
-            }
 
-            var programStructDataList = ntEnterComps.stream().map(
-                    nt -> new ProgramStructureDataRecord(
-                            nt.nField.getValue(),
-                            nt.instrField.getValue(),
-                            nt.cacheMissesField.getValue(),
-                            nt.dataReadField.getValue(),
-                            nt.tField.getValue())).toList();
             onSave.accept(name, description, programTestInfoList, programStructDataList);
-            Notification.show("Program " + name + " saved");
         });
 
         layout.add(accordion);
@@ -298,6 +324,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
         var addAppDialog = addAppDialog((name, description, programTests, programStructureDataList) -> {
             programManagerService.save(name, description, programTests, programStructureDataList);
             appGrid.setItems(programManagerService.findAll());
+            Notification.show("Program " + name + " saved");
         }, Optional.empty());
         var addAppConfigButton = new Button("Add app config", _ -> addAppDialog.open());
         appGrid.addColumn(ProgramInfo::name).setHeader("Name");

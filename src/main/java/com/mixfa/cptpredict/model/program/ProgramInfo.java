@@ -42,9 +42,9 @@ public record ProgramInfo(
         );
 
         return Map.of(
-                IPCBenchmarkApp.Type.CPU, Utils.map(0.0, 1.0, minGrowth, maxGrowth, instrGrowthRate),
-                IPCBenchmarkApp.Type.RAM, Utils.map(0.0, 1.0, minGrowth, maxGrowth, cacheMissesGrowthRate),
-                IPCBenchmarkApp.Type.DISK, Utils.map(0.0, 1.0, minGrowth, maxGrowth, dataReadGrowthRate)
+                IPCBenchmarkApp.Type.CPU, Utils.map(minGrowth, maxGrowth, 0.0, 1.0, instrGrowthRate),
+                IPCBenchmarkApp.Type.RAM, Utils.map(minGrowth, maxGrowth, 0.0, 1.0, cacheMissesGrowthRate),
+                IPCBenchmarkApp.Type.DISK, Utils.map(minGrowth, maxGrowth, 0.0, 1.0, dataReadGrowthRate)
         );
     }
 }
