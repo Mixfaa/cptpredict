@@ -4,6 +4,7 @@ import com.mixfa.cptpredict.model.VMBenchmarkResult;
 
 public record ProgramTestInfo(
         VMBenchmarkResult vmBenchmarkResult,
+        double dataAmount,
         double appIpc
 ) {
     @Override

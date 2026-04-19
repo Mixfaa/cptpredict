@@ -1,13 +1,18 @@
 import { injectGlobalWebcomponentCss } from 'Frontend/generated/jar-resources/theme-util.js';
 
+import { injectGlobalCss } from 'Frontend/generated/jar-resources/theme-util.js';
+
+import { css, unsafeCSS, registerStyles } from '@vaadin/vaadin-themable-mixin';
+import $cssFromFile_0 from 'Frontend/generated/jar-resources/styles/chartjsContainer.css?inline';
+import $cssFromFile_1 from 'Frontend/generated/jar-resources/styles/loadingComponents.css?inline';
 import '@vaadin/app-layout/src/vaadin-app-layout.js';
+import 'Frontend/generated/jar-resources/lit-renderer.ts';
+import 'Frontend/generated/jar-resources/flow-component-renderer.js';
+import 'Frontend/generated/jar-resources/flow-component-directive.js';
 import '@vaadin/confirm-dialog/src/vaadin-confirm-dialog.js';
 import '@vaadin/button/src/vaadin-button.js';
 import '@vaadin/popover/src/vaadin-popover.js';
 import 'Frontend/generated/jar-resources/vaadin-popover/popover.ts';
-import 'Frontend/generated/jar-resources/lit-renderer.ts';
-import 'Frontend/generated/jar-resources/flow-component-renderer.js';
-import 'Frontend/generated/jar-resources/flow-component-directive.js';
 import '@vaadin/field-highlighter/src/vaadin-field-highlighter.js';
 import '@vaadin-component-factory/vcf-date-range-picker/vcf-date-range-picker.js';
 import '@vaadin/common-frontend/ConnectionIndicator.js';
@@ -89,8 +94,15 @@ import '@vaadin/virtual-list/src/vaadin-virtual-list.js';
 import 'Frontend/generated/jar-resources/virtualListConnector.js';
 import '@vaadin/vaadin-lumo-styles/vaadin-iconset.js';
 import 'Frontend/generated/jar-resources/src/vcf-spinner.ts';
+import 'Frontend/generated/jar-resources/lib/chartjs/chartjs.js';
+import 'Frontend/generated/jar-resources/src/chartThemeManager.js';
+import 'Frontend/generated/jar-resources/src/chartControlFunc.js';
+import 'Frontend/generated/jar-resources/src/chartClientToServerUpdater.js';
 import 'Frontend/generated/jar-resources/date-fns-limited.min.js';
 import 'Frontend/generated/jar-resources/enhancedDateRangePickerConnector.js';
+
+injectGlobalWebcomponentCss($cssFromFile_0.toString());
+injectGlobalWebcomponentCss($cssFromFile_1.toString());
 const loadOnDemand = (key) => { return Promise.resolve(0); }
 window.Vaadin = window.Vaadin || {};
 window.Vaadin.Flow = window.Vaadin.Flow || {};

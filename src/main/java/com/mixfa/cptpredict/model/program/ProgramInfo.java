@@ -1,6 +1,6 @@
 package com.mixfa.cptpredict.model.program;
 
-import com.mixfa.cptpredict.Utils;
+import com.mixfa.cptpredict.model.VMBenchmarkResult;
 import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
 import lombok.experimental.FieldNameConstants;
 import org.dizitart.no2.repository.annotations.Entity;
@@ -9,7 +9,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.ToDoubleFunction;
 
 @Document
 @Entity
@@ -26,25 +25,31 @@ public record ProgramInfo(
 // just to save input data, not used for any calculations
 ) {
     // to see what app is using more
-    public Map<IPCBenchmarkApp.Type, Double> calculateWeights(ToDoubleFunction<ComplexityModel> weightFunction) {
-        var instrGrowthRate = weightFunction.applyAsDouble(instructionModel);
-        var cacheMissesGrowthRate = weightFunction.applyAsDouble(cacheMissesModel);
-        var dataReadGrowthRate = weightFunction.applyAsDouble(dataReadModel);
+    public Map<IPCBenchmarkApp.Type, Double> calculateWeights(VMBenchmarkResult vmBenchmark, double dataAmount) {
 
-        var maxGrowth = Math.max(
-                instrGrowthRate,
-                Math.max(cacheMissesGrowthRate, dataReadGrowthRate)
-        );
+        var cacheMisses = cacheMissesModel.getFunction().applyAsDouble(dataAmount);
+        var dataRead = dataReadModel.getFunction().applyAsDouble(dataAmount);
+        var instructions = instructionModel.getFunction().applyAsDouble(dataAmount) - (cacheMisses + dataRead);
 
-        var minGrowth = Math.min(
-                instrGrowthRate,
-                Math.min(cacheMissesGrowthRate, dataReadGrowthRate)
-        );
+        var avgCpuIpc = vmBenchmark.avgIPC(IPCBenchmarkApp.Type.CPU);
+        var avgRamIpc = vmBenchmark.avgIPC(IPCBenchmarkApp.Type.RAM);
+        var avgDiskIpc = vmBenchmark.avgIPC(IPCBenchmarkApp.Type.DISK);
+
+        var i = instructions / avgCpuIpc;
+        var c = cacheMisses * (avgCpuIpc / (avgRamIpc * avgRamIpc));
+        var d = dataRead * (avgCpuIpc / (avgDiskIpc * avgDiskIpc));
+
+        var sum = i + c + d;
+
+        var ratioI = i / sum;
+        var ratioC = c / sum;
+        var ratioD = d / sum;
 
         return Map.of(
-                IPCBenchmarkApp.Type.CPU, Utils.map(minGrowth, maxGrowth, 0.0, 1.0, instrGrowthRate),
-                IPCBenchmarkApp.Type.RAM, Utils.map(minGrowth, maxGrowth, 0.0, 1.0, cacheMissesGrowthRate),
-                IPCBenchmarkApp.Type.DISK, Utils.map(minGrowth, maxGrowth, 0.0, 1.0, dataReadGrowthRate)
+                IPCBenchmarkApp.Type.CPU, ratioI,
+                IPCBenchmarkApp.Type.RAM, ratioC,
+                IPCBenchmarkApp.Type.DISK, ratioD
         );
     }
+
 }

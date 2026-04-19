@@ -1,32 +1,34 @@
 package com.mixfa.cptpredict.ui;
 
+import com.mixfa.cptpredict.misc.BigOAnalysis;
+import com.mixfa.cptpredict.model.VMBenchmarkResult;
 import com.mixfa.cptpredict.model.VMConfig;
 import com.mixfa.cptpredict.model.estimation.EstimationModel;
 import com.mixfa.cptpredict.model.estimation.EstimationModel2;
 import com.mixfa.cptpredict.model.estimation.EstimationResult;
-import com.mixfa.cptpredict.model.program.ComplexityModel;
 import com.mixfa.cptpredict.model.program.ProgramInfo;
 import com.mixfa.cptpredict.model.program.ProgramTestInfo;
 import com.mixfa.cptpredict.service.EstimationModelManager;
 import com.mixfa.cptpredict.service.repo.CustomizableRepo;
 import com.mixfa.cptpredict.service.repo.RepoHolder;
-import com.mixfa.cptpredict.ui.components.VmConfigCompRenderer;
+import com.mixfa.cptpredict.ui.components.BenchmarkResultCompRenderer;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.combobox.MultiSelectComboBox;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
-import com.vaadin.flow.component.textfield.IntegerField;
+import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.Route;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Route("/predict")
 public class PredictionsRoute extends BasicAppLayout {
@@ -47,30 +49,39 @@ public class PredictionsRoute extends BasicAppLayout {
 
         switch (estimationModel) {
             case EstimationModel2 em2 -> {
-                var testIpcSelect = new Select<ProgramTestInfo>("Select program test data");
-                testIpcSelect.setItems(programInfo.programTests());
-                testIpcSelect.setItemLabelGenerator(ProgramTestInfo::toString);
+                var benchmarkResultSelect = new Select<VMBenchmarkResult>("Select benchmark result to use data from");
+                benchmarkResultSelect.setRenderer(BenchmarkResultCompRenderer.getInstance());
+                benchmarkResultSelect.setItems(programInfo.programTests().stream().map(ProgramTestInfo::vmBenchmarkResult).collect(Collectors.toUnmodifiableSet()));
 
-//                var avgTestAppIpc = programInfo.programTests().stream().mapToDouble(ProgramTestInfo::appIpc).average().getAsDouble();
-
-                var dataAmountField = new IntegerField("Data amount (N)");
+                var dataAmountField = new NumberField("Data amount (N)");
                 dataAmountField.setMin(1);
 
                 var getResultsButton = new Button("Get results", _ -> {
-                    var testResult = testIpcSelect.getValue();
 
-                    var weightedIpcCalculator = new EstimationModel2.IpcCalculator.WeightedIpcCalculator(programInfo.calculateWeights(ComplexityModel::growthRate));
-//                    var calculator = EstimationModel2.IpcCalculator.DefaultIpcCalculator.getInstance();
+                    System.out.println("Raw time analys: " +
+                            programInfo.timeModel().getFunction().applyAsDouble(dataAmountField.getValue())
+                    );
 
+                    var benchmarkResult = benchmarkResultSelect.getValue();
+                    var ipcCalculator = new EstimationModel2.IpcCalculator.WeightedIpcCalculator(programInfo.calculateWeights(benchmarkResult, dataAmountField.getValue()));
+//                    var ipcCalculator = EstimationModel2.IpcCalculator.DefaultIpcCalculator.getInstance();
+                    var appIpcModel = BigOAnalysis.analyze(
+                            programInfo.programTests().stream().mapToDouble(ProgramTestInfo::dataAmount).toArray(),
+                            programInfo.programTests().stream().mapToDouble(ProgramTestInfo::appIpc).toArray()
+                    );
+
+                    var appIpc = appIpcModel.getFunction().applyAsDouble(dataAmountField.getValue());
+
+                    System.out.println("appIpc: " + appIpc);
                     var results = vmConfigs.stream().map(vmConfig -> {
                         var params = new EstimationModel2.Parameters(
                                 programInfo,
-                                testResult.vmBenchmarkResult(),
-                                testResult.vmBenchmarkResult().highestFreqCore(),
+                                benchmarkResult,
+                                benchmarkResult.highestFreqCore(),
                                 vmConfig.benchmarkResult().highestFreqCore(),
-                                weightedIpcCalculator,
-                                testResult.appIpc(),
-                                dataAmountField.getValue()
+                                ipcCalculator,
+                                appIpc,
+                                dataAmountField.getValue().longValue()
                         );
 
                         return em2.estimate(vmConfig, params);
@@ -79,7 +90,7 @@ public class PredictionsRoute extends BasicAppLayout {
                     resultGrid.setItems(results);
                 });
 
-                formLayout.add(testIpcSelect, dataAmountField, getResultsButton);
+                formLayout.add(benchmarkResultSelect, dataAmountField, getResultsButton);
             }
         }
 
@@ -111,11 +122,11 @@ public class PredictionsRoute extends BasicAppLayout {
         return new VerticalLayout(uiLayout, appSelect, resultGrid);
     }
 
-    private void onSelectValueChanged(MultiSelectComboBox<VMConfig> vmConfigSelect, Select<EstimationModel<?>> estimationModelSelect, VerticalLayout estimationLayout) {
-        var vmConfigs = vmConfigSelect.getValue();
+    private void onSelectValueChanged(Select<EstimationModel<?>> estimationModelSelect, VerticalLayout estimationLayout) {
+        var vmConfigs = new HashSet<>(vmConfigRepo.findAll());
         var estimationModel = estimationModelSelect.getValue();
 
-        if (vmConfigs != null && !vmConfigs.isEmpty() && estimationModel != null) {
+        if (!vmConfigs.isEmpty() && estimationModel != null) {
             estimationLayout.removeAll();
             estimationLayout.add(makePredictionUI(vmConfigs, estimationModel));
         }
@@ -133,25 +144,17 @@ public class PredictionsRoute extends BasicAppLayout {
         var horizontalLayout = new HorizontalLayout();
         horizontalLayout.setWidthFull();
 
-        var vmConfigSelect = new MultiSelectComboBox<>("Choose VM Config", vmConfigRepo.findAll());
-        vmConfigSelect.setWidthFull();
-        vmConfigSelect.setItemLabelGenerator(VMConfig::name);
-        vmConfigSelect.setRenderer(VmConfigCompRenderer.getInstance());
-
         Select<EstimationModel<?>> estimationModelSelect = new Select<>("Choose estimation model", estimationModelManager.findAll());
         estimationModelSelect.setWidthFull();
         estimationModelSelect.setRenderer(new ComponentRenderer<>(estimationModel -> new Span(estimationModel.name())));
-        horizontalLayout.add(new VerticalLayout(vmConfigSelect) {{
-            setWidth("40%");
-        }}, new VerticalLayout(estimationModelSelect) {{
+        horizontalLayout.add(new VerticalLayout(estimationModelSelect) {{
             setWidth("40%");
         }});
         layout.add(horizontalLayout);
 
         var estimationLayout = new VerticalLayout();
 
-        vmConfigSelect.addValueChangeListener(_ -> onSelectValueChanged(vmConfigSelect, estimationModelSelect, estimationLayout));
-        estimationModelSelect.addValueChangeListener(_ -> onSelectValueChanged(vmConfigSelect, estimationModelSelect, estimationLayout));
+        estimationModelSelect.addValueChangeListener(_ -> onSelectValueChanged(estimationModelSelect, estimationLayout));
         layout.add(estimationLayout);
         return layout;
     }

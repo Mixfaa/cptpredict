@@ -4,6 +4,7 @@ import com.mixfa.cptpredict.model.benchmark.BenchmarkAppResult;
 import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.function.ToIntFunction;
 
 public record VMBenchmarkResult(
@@ -38,5 +39,21 @@ public record VMBenchmarkResult(
 
     public double avgIPC(IPCBenchmarkApp.Type benchmarkType) {
         return avgIPC(benchmarkType, VMBenchmarkResult::highestFreqCore);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof VMBenchmarkResult(String name, int count, double[] freqKhz, BenchmarkAppResult[] results))) return false;
+
+        return coreCount == count && Objects.equals(cpuName, name) && Arrays.equals(efficientFreqKhz, freqKhz) && Arrays.equals(benchmarkResults, results);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hashCode(cpuName);
+        result = 31 * result + coreCount;
+        result = 31 * result + Arrays.hashCode(efficientFreqKhz);
+        result = 31 * result + Arrays.hashCode(benchmarkResults);
+        return result;
     }
 }

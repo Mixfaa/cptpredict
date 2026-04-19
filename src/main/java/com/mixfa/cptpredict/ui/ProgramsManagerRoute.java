@@ -2,14 +2,13 @@ package com.mixfa.cptpredict.ui;
 
 import com.mixfa.cptpredict.misc.BigOAnalysis;
 import com.mixfa.cptpredict.model.VMConfig;
-import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
-import com.mixfa.cptpredict.model.program.ComplexityModel;
 import com.mixfa.cptpredict.model.program.ProgramInfo;
 import com.mixfa.cptpredict.model.program.ProgramStructureDataRecord;
 import com.mixfa.cptpredict.model.program.ProgramTestInfo;
 import com.mixfa.cptpredict.service.ProgramManagerService;
 import com.mixfa.cptpredict.service.repo.CustomizableRepo;
 import com.mixfa.cptpredict.service.repo.RepoHolder;
+import com.mixfa.cptpredict.ui.components.BetterSpan;
 import com.mixfa.cptpredict.ui.components.DialogCloseButton;
 import com.mixfa.cptpredict.ui.components.VmConfigCompRenderer;
 import com.mixfa.cptpredict.ui.misc.ComplexityModelsToText;
@@ -92,10 +91,6 @@ public class ProgramsManagerRoute extends BasicAppLayout {
         }
     }
 
-    private static NTEnter makeNTEnter(Consumer<NTEnter> onRemove) {
-        return new NTEnter(onRemove);
-    }
-
     interface ProgramInfoDataConsumer {
         void accept(String name, String description, List<ProgramTestInfo> programTests, List<ProgramStructureDataRecord> programStructureDataList);
     }
@@ -149,7 +144,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
             });
 
             fields.add(ntEnterComps.stream().map(NTEnter::component).toList());
-            var complexityModelSpan = new Span();
+            var complexityModelSpan = new BetterSpan();
 
             programInfo.ifPresent(p -> complexityModelSpan.setText(ComplexityModelsToText.apply(p)));
             var analyzeButton = new Button("analyze and set", _ -> {
@@ -194,6 +189,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
 
                     programTestInfoList.add(new ProgramTestInfo(
                             vmConfig.benchmarkResult(),
+                            programStructureDataRecord.dataAmount(),
                             ipc
                     ));
                 }
@@ -218,74 +214,18 @@ public class ProgramsManagerRoute extends BasicAppLayout {
         programInfo.ifPresent(p -> {
             nameField.setValue(p.name());
             descriptionField.setValue(p.description());
-            programTestInfoList.addAll(p.programTests());
         });
         {
-//            var nField = new NumberField("Data amount (N)") {{
-//                setMin(1.0);
-//            }};
-//            var timeInput = new NumberField("Time required (in milliseconds)") {{
-//                setMin(1.0);
-//            }};
 
-//            var ipcSpan = new Span("IPC: ");
-
-//            var vmSelect = new Select<VMConfig>("Select VM Configuration");
-//            vmSelect.setRenderer(VmConfigCompRenderer.getInstance());
-//            vmSelect.setItems(vmConfigRepo.findAll());
-
-//            Runnable onEdited = () -> {
-//                var n = nField.getValue();
-//                var t = timeInput.getValue();
-//                var vmConfig = vmSelect.getValue();
-//
-//                if (n == null || t == null || vmConfig == null) {
-//                    return;
-//                }
-//
-//                var coreFreqKhz = vmConfig.benchmarkResult().efficientFreqKhz()[vmConfig.benchmarkResult().highestFreqCore()];
-//                var ipc = (n / t) / coreFreqKhz;
-//
-//                ipcSpan.setText("IPC: " + ipc);
-//            };
-
-//            nField.addValueChangeListener(_ -> onEdited.run());
-//            timeInput.addValueChangeListener(_ -> onEdited.run());
-
-            testsGrid.setItems(programTestInfoList);
             testsGrid.setWidthFull();
             testsGrid.addColumn(info -> info.vmBenchmarkResult().cpuName()).setHeader("CPU");
+            testsGrid.addColumn(info -> String.format("%.1f", info.dataAmount())).setHeader("Data amount");
             testsGrid.addColumn(info -> String.format("%.5f", info.appIpc())).setHeader("IPC");
             testsGrid.addComponentColumn(info -> new Button(VaadinIcon.CLOSE_CIRCLE.create(), _ -> {
                 programTestInfoList.remove(info);
                 testsGrid.setItems(programTestInfoList);
             }));
-//            var setBtn = new Button("add", _ -> {
-//                var vmConfig = vmSelect.getValue();
-//                if (vmConfig == null) {
-//                    Notification.show("Select vm configuration");
-//                    return;
-//                }
-//
-//                var n = nField.getValue();
-//                var t = timeInput.getValue();
-//
-//                if (n == null || t == null) {
-//                    Notification.show("Enter data amount and time required (in ms)");
-//                    return;
-//                }
-//                var coreFreqKhz = vmConfig.benchmarkResult().efficientFreqKhz()[vmConfig.benchmarkResult().highestFreqCore()];
-//                var ipc = (n / t) / coreFreqKhz;
-//
-//                programTestInfoList.add(new ProgramTestInfo(
-//                        vmConfig.benchmarkResult(),
-//                        ipc
-//                ));
-//                testsGrid.setItems(programTestInfoList);
-//                Notification.show("Result added");
-//            });
-
-//            addTestsLayout.add(vmSelect, nField, timeInput, ipcSpan, setBtn, testsGrid);
+            testsGrid.setItems(programTestInfoList);
             addTestsLayout.add(testsGrid);
         }
 
@@ -327,16 +267,50 @@ public class ProgramsManagerRoute extends BasicAppLayout {
             Notification.show("Program " + name + " saved");
         }, Optional.empty());
         var addAppConfigButton = new Button("Add app config", _ -> addAppDialog.open());
-        appGrid.addColumn(ProgramInfo::name).setHeader("Name");
-        appGrid.addColumn(ProgramInfo::description).setHeader("Name");
-        appGrid.addColumn(ComplexityModelsToText::apply).setHeader("Model");
-        appGrid.addColumn(programInfo -> {
-            var weights = programInfo.calculateWeights(ComplexityModel::growthRate);
-            return String.format("CPU: %.3f\nRAM: %.3f\nDISK: %.3f",
-                    weights.get(IPCBenchmarkApp.Type.CPU),
-                    weights.get(IPCBenchmarkApp.Type.RAM),
-                    weights.get(IPCBenchmarkApp.Type.DISK));
-        }).setHeader("Dependencies weights");
+        appGrid.addColumn(ProgramInfo::name).setHeader("Name").setResizable(true);
+        appGrid.addColumn(ProgramInfo::description).setHeader("Description").setResizable(true);
+        appGrid.addComponentColumn(programInfo -> new BetterSpan(ComplexityModelsToText.apply(programInfo))).setHeader("Model").setResizable(true);
+//        appGrid.addColumn(programInfo -> {
+//            var vmBenchmarkResult = programInfo.programTests().getFirst().vmBenchmarkResult();
+//            var weights = programInfo.calculateWeights(vmBenchmarkResult);
+//            return String.format("CPU: %.3f\nRAM: %.3f\nDISK: %.3f",
+//                    weights.get(IPCBenchmarkApp.Type.CPU),
+//                    weights.get(IPCBenchmarkApp.Type.RAM),
+//                    weights.get(IPCBenchmarkApp.Type.DISK));
+//        }).setHeader("Dependencies weights").setResizable(true);
+//        appGrid.addComponentColumn(p -> new Button("Show dependencies chart", _ -> {
+//            var dialog = new Dialog();
+//            dialog.setSizeFull();
+//
+//            dialog.add(new VerticalLayout() {{
+//                var chartConteiner = new ChartContainer();
+//                chartConteiner.showChart(
+//                        new LineChart()
+//                                .setData(new LineData()
+//                                        // Добавляем подписи по оси X (размеры данных, которые мы тестировали)
+//                                        .setLabels(p.programStructureDataList().stream()
+//                                                .map(ProgramStructureDataRecord::dataAmount) // Например, "256KB", "1MB", "16MB"...
+//                                                .map(String::valueOf)
+//                                                .toArray(String[]::new))
+//
+//                                        .addDataset(new LineDataset()
+//                                                .setLabel("Latency (ns/op)") // Инструкции нам не интересны, интересно время!
+//                                                .setData(p.programStructureDataList().stream()
+//                                                        .mapToDouble(ProgramStructureDataRecord::timeInMs)
+//                                                        .boxed().toArray(Number[]::new)
+//                                                )
+//                                        )
+//                                )
+//                                .toJson()
+//                );
+//                setSizeFull();
+//                chartConteiner.setSizeFull();
+//                add(chartConteiner);
+//            }});
+//
+//            dialog.getFooter().add(new DialogCloseButton(dialog));
+//            dialog.open();
+//        }));
         appGrid.addComponentColumn(p -> new Button(VaadinIcon.COG.create(), _ -> addAppDialog((name, description, programTests, programStructureDataList) -> {
             programManagerService.delete(p);
             programManagerService.save(name, description, programTests, programStructureDataList);
@@ -346,8 +320,8 @@ public class ProgramsManagerRoute extends BasicAppLayout {
             programManagerService.delete(p);
             appGrid.setItems(programManagerService.findAll());
         })).setHeader("Delete");
-
         appGrid.setItems(programManagerService.findAll());
+        appGrid.recalculateColumnWidths();
         layout.add(addAppConfigButton, appGrid);
 
         return layout;
