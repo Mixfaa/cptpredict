@@ -29,15 +29,15 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
     private static final String BENCHMARKS_DIR_GLOBAL = "benchmarks/";
 
     private static final List<IPCBenchmarkApp> BENCHMARKS = List.of(
-            new IPCBenchmarkApp("ipc_bench1", IPCBenchmarkApp.Type.CPU, 1843849798.0),
-            new IPCBenchmarkApp("ipc_bench2", IPCBenchmarkApp.Type.CPU, 904967447.0),
-            new IPCBenchmarkApp("ipc_bench3", IPCBenchmarkApp.Type.CPU, 713284622.0),
-            new IPCBenchmarkApp("ipc_bench4", IPCBenchmarkApp.Type.RAM, 779843492.0),
-            new IPCBenchmarkApp("ipc_bench5", IPCBenchmarkApp.Type.RAM, 1227001436.0),
-            new IPCBenchmarkApp("ipc_bench6", IPCBenchmarkApp.Type.RAM, 373749492.0),
-            new IPCBenchmarkApp("ipc_bench7", IPCBenchmarkApp.Type.RAM, 1158078558.0),
-            new IPCBenchmarkApp("ipc_bench8", IPCBenchmarkApp.Type.DISK, 1075638987.0),
-            new IPCBenchmarkApp("ipc_bench9", IPCBenchmarkApp.Type.DISK, 122446837.0)
+            new IPCBenchmarkApp("ipc_bench1", IPCBenchmarkApp.Type.CPU, 42612519311.0),
+            new IPCBenchmarkApp("ipc_bench2", IPCBenchmarkApp.Type.CPU, 31266231637.0),
+            new IPCBenchmarkApp("ipc_bench3", IPCBenchmarkApp.Type.CPU, 20047469552.0),
+            new IPCBenchmarkApp("ipc_bench4", IPCBenchmarkApp.Type.RAM, 14053396507.0),
+            new IPCBenchmarkApp("ipc_bench5", IPCBenchmarkApp.Type.RAM, 1227000595.0),
+            new IPCBenchmarkApp("ipc_bench6", IPCBenchmarkApp.Type.RAM, 22368686340.0),
+            new IPCBenchmarkApp("ipc_bench7", IPCBenchmarkApp.Type.RAM, 9462805294.0),
+            new IPCBenchmarkApp("ipc_bench8", IPCBenchmarkApp.Type.DISK, 1075639543.0),
+            new IPCBenchmarkApp("ipc_bench9", IPCBenchmarkApp.Type.DISK, 122448109.0)
     );
     private static final String FREQ_BENCHMARK_WIN_AMD64 = "freq-benchmark-x86_64-pc-windows-gnu.exe";
     private static final String FREQ_BENCHMARK_WIN_ARM64 = "freq-benchmark-aarch64-pc-windows-gnullvm.exe";
@@ -117,15 +117,15 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
 
         var results = new ArrayList<BenchmarkAppResult>(); //new BenchmarkAppResult[BENCHMARKS.size()];
 
+        var cycles = 3;
         for (IPCBenchmarkApp benchmark : BENCHMARKS) {
-            var bestTime = Double.MAX_VALUE;
-            for (int j = 0; j < 5; j++) {
-                var time = runIpcBenchmark(benchmark, os, arch, commandExecutor, benchmarksDir);
-                if (time < bestTime)
-                    bestTime = time;
+            var totalTime = 0.0;
+            for (int j = 0; j < cycles; j++) {
+                totalTime += runIpcBenchmark(benchmark, os, arch, commandExecutor, benchmarksDir);
             }
-            if (bestTime == 0) bestTime = 1; // are you running on nuke?
-            var instrPerMs = benchmark.testedInstructions() / bestTime;
+            var time = totalTime / cycles;
+            if (time == 0) time = 1; // are you running on nuke?
+            var instrPerMs = benchmark.testedInstructions() / time;
 
             results.add(new BenchmarkAppResult(benchmark, instrPerMs));
         }

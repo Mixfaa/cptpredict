@@ -18,7 +18,12 @@ public record ComplexityModel(
         ON("O(N)", "T(N) = %.2e * N + %.2e", 2),
         ONlogN("O(N log N)", "T(N) = %.2e * N*log2(N) + %.2e", 2),
         ONpow2("O(N^2)", "T(N) = %.2e * N^2 + %.2e", 2),
-        ONpow3("O(N^3)", "T(N) = %.2e * N^3 + %.2e", 2);
+        ONpow3("O(N^3)", "T(N) = %.2e * N^3 + %.2e", 2),
+
+        O1overLogN("O1overLogN","T(N) = %.6f / log₂(N) + %.6f", 2),
+        O1overCbrtN("O1overCbrtN","T(N) = %.6f / ∛N + %.6f",     2),
+        O1overSqrtN("O1overSqrtN","T(N) = %.6f / √N + %.6f",     2),
+        O1overN("O1overN","T(N) = %.6f / N + %.6f",          2);
 
         public final String name;
         public final String format;
@@ -47,6 +52,10 @@ public record ComplexityModel(
             case ONlogN -> (n, c, b) -> c * n * FastMath.log(2, n + 1e-9) + b;
             case ONpow2 -> (n, c, b) -> c * FastMath.pow(n, 2) + b;
             case ONpow3 -> (n, c, b) -> c * FastMath.pow(n, 3) + b;
+            case O1overLogN  -> (n, c, b) -> c / FastMath.log(2, n) + b;
+            case O1overCbrtN -> (n, c, b) -> c / FastMath.cbrt(n)   + b;
+            case O1overSqrtN -> (n, c, b) -> c / FastMath.sqrt(n)   + b;
+            case O1overN     -> (n, c, b) -> c / n                  + b;
         };
     }
 

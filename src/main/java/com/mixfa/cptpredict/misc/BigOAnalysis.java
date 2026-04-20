@@ -12,26 +12,30 @@ import java.util.List;
 public class BigOAnalysis {
 
     private static final List<ModelInfo> MODELS = List.of(
+            // --- Зростаючі ---
             new ModelInfo(ComplexityModel.Type.O1),
             new ModelInfo(ComplexityModel.Type.OlogN),
             new ModelInfo(ComplexityModel.Type.OsqrtN),
             new ModelInfo(ComplexityModel.Type.ON),
             new ModelInfo(ComplexityModel.Type.ONlogN),
             new ModelInfo(ComplexityModel.Type.ONpow2),
-            new ModelInfo(ComplexityModel.Type.ONpow3)
+            new ModelInfo(ComplexityModel.Type.ONpow3),
+            // --- Спадні (нові) ---
+            new ModelInfo(ComplexityModel.Type.O1overLogN),
+            new ModelInfo(ComplexityModel.Type.O1overCbrtN),
+            new ModelInfo(ComplexityModel.Type.O1overSqrtN),
+            new ModelInfo(ComplexityModel.Type.O1overN)
     );
 
     static class ModelInfo {
         ComplexityModel.Type type;
         ParametricUnivariateFunction func;
         ComplexityModel.Model model;
-        String format;
         int pCount;
 
         ModelInfo(ComplexityModel.Type complexityModelType) {
             this.type = complexityModelType;
             this.model = ComplexityModel.getModel(complexityModelType);
-            this.format = complexityModelType.format;
             this.pCount = complexityModelType.paramsCount;
 
             this.func = new ParametricUnivariateFunction() {
@@ -42,18 +46,10 @@ public class BigOAnalysis {
 
                 @Override
                 public double[] gradient(double n, double... p) {
-                    // ИСПРАВЛЕНИЕ 1: Точный аналитический градиент вместо h = 1e-8.
-                    // Поскольку формула всегда имеет вид T = C * f(N) + B,
-                    // Производная по C (p[0]) - это просто само значение f(N).
-                    // Производная по B (p[1]) - это всегда 1.0.
+                    // T = C * f(N) + B  =>  dT/dC = f(N),  dT/dB = 1
                     double[] grad = new double[p.length];
-
-                    // Чтобы получить чистую f(N), подставляем C=1 и B=0
-                    grad[0] = model.value(n, 1.0, 0.0);
-
-                    if (p.length > 1) {
-                        grad[1] = 1.0;
-                    }
+                    grad[0] = model.value(n, 1.0, 0.0); // f(N) при C=1, B=0
+                    if (p.length > 1) grad[1] = 1.0;
                     return grad;
                 }
             };
@@ -61,87 +57,111 @@ public class BigOAnalysis {
     }
 
     public static ComplexityModel analyze(double[] N, double[] T) {
-        if (N.length != T.length || N.length == 0) {
+        if (N.length != T.length || N.length == 0)
             throw new RuntimeException("N and T size mismatch or empty");
-        }
 
         double meanT = StatUtils.mean(T);
-        double stdT = FastMath.sqrt(StatUtils.variance(T));
-        double cv = stdT / (meanT + 1e-15);
+        double stdT  = FastMath.sqrt(StatUtils.variance(T));
+        double cv    = stdT / (meanT + 1e-15);
+
+        // Визначаємо, чи дані загалом спадають (для пріоритизації моделей)
+        boolean isDecreasing = T[T.length - 1] < T[0];
+        double minT = StatUtils.min(T);
 
         WeightedObservedPoints points = new WeightedObservedPoints();
         for (int i = 0; i < N.length; i++) points.add(N[i], T[i]);
 
-        ModelInfo bestInfo = null;
-        double minAIC = Double.POSITIVE_INFINITY;
-        double[] bestParams = null;
+        ModelInfo bestInfo   = null;
+        double    minAIC     = Double.POSITIVE_INFINITY;
+        double[]  bestParams = null;
 
         for (ModelInfo m : MODELS) {
+            // Пропускаємо зростаючі (крім O1) якщо дані явно спадають,
+            // щоб уникнути некоректних підгонок з від'ємним C
+            boolean isDecreasingModel = m.type.name().contains("over");
+            if (isDecreasing && !isDecreasingModel && m.type != ComplexityModel.Type.O1) continue;
+
             try {
-                double[] startGuess;
-                if (m.pCount == 1) {
-                    startGuess = new double[]{meanT};
-                } else {
-                    double lastN = N[N.length - 1];
-                    double lastT = T[T.length - 1];
+                double[] startGuess = buildStartGuess(m, N, T, meanT);
 
-                    // ИСПРАВЛЕНИЕ 2: Добавлен ONlogN и улучшена защита от NaN
-                    double estimatedC = switch (m.type) {
-                        case OlogN -> lastT / FastMath.max(1e-9, FastMath.log(2, lastN));
-                        case OsqrtN -> lastT / FastMath.max(1e-9, FastMath.sqrt(lastN));
-                        case ON -> lastT / FastMath.max(1e-9, lastN);
-                        case ONlogN -> lastT / FastMath.max(1e-9, lastN * FastMath.log(2, lastN));
-                        case ONpow2 -> lastT / FastMath.max(1e-9, FastMath.pow(lastN, 2));
-                        case ONpow3 -> lastT / FastMath.max(1e-9, FastMath.pow(lastN, 3));
-                        default -> 1e-10;
-                    };
-
-                    // Грубая оценка стартового B (смещения)
-                    double startB = T[0] - estimatedC * m.func.value(N[0], 1.0, 0.0);
-                    startGuess = new double[]{estimatedC, startB};
-                }
-
-                // ИСПРАВЛЕНИЕ 3: 100 млн итераций — это слишком много.
-                // С правильным градиентом алгоритму хватит и 1000 итераций.
                 SimpleCurveFitter fitter = SimpleCurveFitter.create(m.func, startGuess)
                         .withMaxIterations(5000);
-
                 double[] params = fitter.fit(points.toList());
 
-                // Вычисляем MSE
+                // --- Перевірка: модель не повинна давати від'ємні значення ---
+                boolean goesNegative = false;
+                for (double n : N) {
+                    if (m.func.value(n, params) < 0) {
+                        goesNegative = true;
+                        break;
+                    }
+                }
+
+                // MSE
                 double mse = 0;
                 for (int i = 0; i < N.length; i++) {
                     double pred = m.func.value(N[i], params);
                     mse += FastMath.pow(T[i] - pred, 2);
                 }
                 mse /= N.length;
-                if (mse <= 0) mse = 1e-15; // Защита от логарифма нуля или отрицательного числа
+                if (mse <= 0) mse = 1e-15;
 
-                // Критерий AIC
-                double aic = N.length * FastMath.log(mse) + 2 * m.pCount;
+                // AIC = n * ln(MSE) + 2k
+                double aic = N.length * FastMath.log(mse) + 2.0 * m.pCount;
 
-                // Бонус константе (если график абсолютно плоский)
+                // Штраф, якщо модель передбачає від'ємні значення (T >= 0 завжди)
+                if (goesNegative) aic += 10_000;
+
+                // Бонус для O1 при плоскому графіку
                 if (m.type == ComplexityModel.Type.O1 && cv < 1e-2) aic -= 1000;
 
                 if (aic < minAIC) {
-                    bestInfo = m;
-                    minAIC = aic;
+                    bestInfo   = m;
+                    minAIC     = aic;
                     bestParams = params;
                 }
 
-            } catch (Exception e) {
-                // Игнорируем модели, которые не смогли сойтись
+            } catch (Exception ignored) {
+                // Модель не змогла зійтись — пропускаємо
             }
         }
 
-        if (bestInfo == null) {
+        if (bestInfo == null)
             throw new RuntimeException("Cannot describe model: no algorithms converged");
-        }
 
         return new ComplexityModel(
                 bestParams[0],
                 bestParams.length > 1 ? bestParams[1] : 0.0,
                 bestInfo.type
         );
+    }
+
+    private static double[] buildStartGuess(ModelInfo m, double[] N, double[] T, double meanT) {
+        if (m.pCount == 1) return new double[]{meanT};
+
+        double lastN = N[N.length - 1];
+        double lastT = T[T.length - 1];
+        final double EPS = 1e-9;
+
+        double estimatedC = switch (m.type) {
+            case OlogN       -> lastT / FastMath.max(EPS, FastMath.log(2, lastN));
+            case OsqrtN      -> lastT / FastMath.max(EPS, FastMath.sqrt(lastN));
+            case ON          -> lastT / FastMath.max(EPS, lastN);
+            case ONlogN      -> lastT / FastMath.max(EPS, lastN * FastMath.log(2, lastN));
+            case ONpow2      -> lastT / FastMath.max(EPS, FastMath.pow(lastN, 2));
+            case ONpow3      -> lastT / FastMath.max(EPS, FastMath.pow(lastN, 3));
+            // Спадні: C ≈ lastT * f(lastN), бо T ≈ C / f(N)
+            case O1overLogN  -> lastT * FastMath.max(EPS, FastMath.log(2, lastN));
+            case O1overCbrtN -> lastT * FastMath.max(EPS, FastMath.cbrt(lastN));
+            case O1overSqrtN -> lastT * FastMath.max(EPS, FastMath.sqrt(lastN));
+            case O1overN     -> lastT * FastMath.max(EPS, lastN);
+            default          -> 1e-10;
+        };
+
+        // Груба оцінка зміщення B
+        double fAtFirst = m.func.value(N[0], 1.0, 0.0); // f(N[0]) при C=1
+        double startB   = T[0] - estimatedC * fAtFirst;
+
+        return new double[]{estimatedC, startB};
     }
 }

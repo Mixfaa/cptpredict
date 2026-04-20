@@ -58,10 +58,6 @@ public class PredictionsRoute extends BasicAppLayout {
 
                 var getResultsButton = new Button("Get results", _ -> {
 
-                    System.out.println("Raw time analys: " +
-                            programInfo.timeModel().getFunction().applyAsDouble(dataAmountField.getValue())
-                    );
-
                     var benchmarkResult = benchmarkResultSelect.getValue();
                     var ipcCalculator = new EstimationModel2.IpcCalculator.WeightedIpcCalculator(programInfo.calculateWeights(benchmarkResult, dataAmountField.getValue()));
 //                    var ipcCalculator = EstimationModel2.IpcCalculator.DefaultIpcCalculator.getInstance();
