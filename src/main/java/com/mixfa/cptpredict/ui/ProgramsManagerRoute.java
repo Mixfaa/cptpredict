@@ -50,6 +50,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
             NumberField nField,
             NumberField instrField,
             NumberField cacheMissesField,
+            NumberField ramUsedField,
             NumberField dataReadField,
             NumberField tField
     ) {
@@ -57,13 +58,14 @@ public class ProgramsManagerRoute extends BasicAppLayout {
             var nField = new NumberField("n");
             var instrField = new NumberField("Instructions");
             var cacheMissesField = new NumberField("Cache misses");
+            var ramUsedField = new NumberField("Ram used (KB)");
             var dataReadField = new NumberField("Data bytes read");
             var tField = new NumberField("time in ms");
             var layout = new HorizontalLayout() {{
                 setWidthFull();
             }};
 
-            var fields = List.of(nField, instrField, cacheMissesField, dataReadField, tField);
+            var fields = List.of(nField, instrField, cacheMissesField, ramUsedField, dataReadField, tField);
             fields.forEach(field -> {
                 field.setMinWidth("0");
                 field.setWidth("100%");
@@ -76,6 +78,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
                     nField,
                     instrField,
                     cacheMissesField,
+                    ramUsedField,
                     dataReadField,
                     tField
             );
@@ -84,6 +87,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
                     nField,
                     instrField,
                     cacheMissesField,
+                    ramUsedField,
                     dataReadField,
                     tField,
                     new Button("remove", _ -> onRemove.accept(this))
@@ -132,6 +136,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
                     nt.instrField().setValue(programStruct.instructions());
                     nt.tField().setValue(programStruct.timeInMs());
                     nt.cacheMissesField().setValue(programStruct.cacheMisses());
+                    nt.ramUsedField().setValue(programStruct.ramUsedKb());
                     nt.dataReadField().setValue(programStruct.dataBytesRead());
                     ntEnterComps.add(nt);
                 }
@@ -152,16 +157,18 @@ public class ProgramsManagerRoute extends BasicAppLayout {
                 var instrList = ntEnterComps.stream().mapToDouble(nt -> nt.instrField.getValue()).toArray();
                 var tList = ntEnterComps.stream().mapToDouble(nt -> nt.tField.getValue()).toArray();
                 var cList = ntEnterComps.stream().mapToDouble(nt -> nt.cacheMissesField.getValue()).toArray();
+                var ramList = ntEnterComps.stream().mapToDouble(nt -> nt.ramUsedField.getValue()).toArray();
                 var dtList = ntEnterComps.stream().mapToDouble(nt -> nt.dataReadField.getValue()).toArray();
 
                 var instCmplxModel = BigOAnalysis.analyze(nList, instrList);
                 var cacheCmplxModel = BigOAnalysis.analyze(nList, cList);
                 var dataBytesCmplxModel = BigOAnalysis.analyze(nList, dtList);
+                var ramCmplxModel = BigOAnalysis.analyze(nList, ramList);
                 var timeCmplxModel = BigOAnalysis.analyze(nList, tList);
 
                 complexityModelSpan.setText(
                         ComplexityModelsToText.apply(
-                                instCmplxModel, cacheCmplxModel, dataBytesCmplxModel, timeCmplxModel
+                                instCmplxModel, cacheCmplxModel, ramCmplxModel, dataBytesCmplxModel, timeCmplxModel
                         )
                 );
 
@@ -172,6 +179,7 @@ public class ProgramsManagerRoute extends BasicAppLayout {
                                         nt.nField.getValue(),
                                         nt.instrField.getValue(),
                                         nt.cacheMissesField.getValue(),
+                                        nt.ramUsedField.getValue(),
                                         nt.dataReadField.getValue(),
                                         nt.tField.getValue())).toList()
                 );
@@ -216,7 +224,6 @@ public class ProgramsManagerRoute extends BasicAppLayout {
             descriptionField.setValue(p.description());
         });
         {
-
             testsGrid.setWidthFull();
             testsGrid.addColumn(info -> info.vmBenchmarkResult().cpuName()).setHeader("CPU");
             testsGrid.addColumn(info -> String.format("%.1f", info.dataAmount())).setHeader("Data amount");

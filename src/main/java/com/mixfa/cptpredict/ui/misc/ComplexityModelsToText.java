@@ -5,20 +5,22 @@ import com.mixfa.cptpredict.model.program.ProgramInfo;
 
 public interface ComplexityModelsToText {
     static String apply(
-            ComplexityModel c1,
-            ComplexityModel c2,
-            ComplexityModel c3,
-            ComplexityModel c4) {
+            ComplexityModel instr,
+            ComplexityModel cache,
+            ComplexityModel ram,
+            ComplexityModel dataRead,
+            ComplexityModel time) {
         return String.format(
-                "Instructions complexity: %s\nCache misses complexity: %s\nData bytes read complexity: %s\nTime complexity: %s",
-                c1.formula(),
-                c2.formula(),
-                c3.formula(),
-                c4.formula()
+                "Instructions complexity: %s\nCache misses complexity: %s\nRam usage: %s\nData bytes read complexity: %s\nTime complexity: %s",
+                instr.formula(),
+                cache.formula(),
+                ram.formula(),
+                dataRead.formula(),
+                time.formula()
         );
     }
 
     static String apply(ProgramInfo p) {
-        return apply(p.instructionModel(), p.cacheMissesModel(), p.dataReadModel(), p.timeModel());
+        return apply(p.instructionModel(), p.cacheMissesModel(), p.ramUsageModel(), p.dataReadModel(), p.timeModel());
     }
 }

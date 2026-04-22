@@ -43,7 +43,12 @@ public class PorgramManagerServiceImpl implements ProgramManagerService {
                 programStructureDataList.stream().mapToDouble(ProgramStructureDataRecord::timeInMs).toArray()
         );
 
-        return programRepo.save(new ProgramInfo(name, description, instructionsComplxModel, cacheMissesComplxModel, dataReadComplxModel, timeComplxModel, programTests, programStructureDataList));
+        var ramUsageComplxModel = BigOAnalysis.analyze(
+                dataAmountArray,
+                programStructureDataList.stream().mapToDouble(ProgramStructureDataRecord::ramUsedKb).toArray()
+        );
+
+        return programRepo.save(new ProgramInfo(name, description, instructionsComplxModel, cacheMissesComplxModel, dataReadComplxModel, timeComplxModel, ramUsageComplxModel, programTests, programStructureDataList));
     }
 
     @Override

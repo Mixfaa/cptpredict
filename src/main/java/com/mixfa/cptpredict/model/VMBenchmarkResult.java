@@ -10,6 +10,7 @@ import java.util.function.ToIntFunction;
 public record VMBenchmarkResult(
         String cpuName,
         int coreCount,
+        long availableMemoryKb,
         double[] efficientFreqKhz,
         BenchmarkAppResult[] benchmarkResults
 ) {
@@ -43,10 +44,13 @@ public record VMBenchmarkResult(
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof VMBenchmarkResult(String name, int count, double[] freqKhz, BenchmarkAppResult[] results))) return false;
+        if (!(o instanceof VMBenchmarkResult(
+                String name, int count, long memoryKb, double[] freqKhz, BenchmarkAppResult[] results
+        ))) return false;
 
-        return coreCount == count && Objects.equals(cpuName, name) && Arrays.equals(efficientFreqKhz, freqKhz) && Arrays.equals(benchmarkResults, results);
+        return coreCount == count && availableMemoryKb == memoryKb && Objects.equals(cpuName, name) && Arrays.equals(efficientFreqKhz, freqKhz) && Arrays.equals(benchmarkResults, results);
     }
+
 
     @Override
     public int hashCode() {

@@ -217,6 +217,7 @@ public class VMConfigManagerRoute extends BasicAppLayout {
         vmConfigGrid.setSizeFull();
         vmConfigGrid.addColumn(VMConfig::name).setHeader("Name");
         vmConfigGrid.addColumn(vmConfig -> vmConfig.benchmarkResult().cpuName()).setHeader("CPU");
+        vmConfigGrid.addColumn(vmConfig -> vmConfig.benchmarkResult().availableMemoryKb() / 1024).setHeader("RAM (mb)");
         vmConfigGrid.addColumn(vmConfig -> String.format("%.4f", vmConfig.benchmarkResult().avgIPC(IPCBenchmarkApp.Type.CPU))).setHeader("CPU IPC");
         vmConfigGrid.addColumn(vmConfig -> String.format("%.4f", vmConfig.benchmarkResult().avgIPC(IPCBenchmarkApp.Type.RAM))).setHeader("RAM IPC");
         vmConfigGrid.addColumn(vmConfig -> String.format("%.6f", vmConfig.benchmarkResult().avgIPC(IPCBenchmarkApp.Type.DISK))).setHeader("DISK I/O IPC");
@@ -243,6 +244,7 @@ public class VMConfigManagerRoute extends BasicAppLayout {
             var layout = new VerticalLayout();
             var benchmarkResult = vmConfig.benchmarkResult();
             layout.add(new Span("CPU: " + benchmarkResult.cpuName()));
+            layout.add(new Span("RAM (mb): " + benchmarkResult.availableMemoryKb() / 1024));
 
             record CoreInfo(
                     int core,

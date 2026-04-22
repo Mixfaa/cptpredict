@@ -1,10 +1,14 @@
 package com.mixfa.cptpredict.model.estimation;
 
+import com.mixfa.cptpredict.misc.BigOAnalysis;
+import com.mixfa.cptpredict.misc.datacollection.CollectableData;
+import com.mixfa.cptpredict.misc.datacollection.DataCollector;
 import com.mixfa.cptpredict.model.VMBenchmarkResult;
 import com.mixfa.cptpredict.model.VMConfig;
 import com.mixfa.cptpredict.model.benchmark.BenchmarkAppResult;
 import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
 import com.mixfa.cptpredict.model.program.ProgramInfo;
+import com.mixfa.cptpredict.model.program.ProgramTestInfo;
 import org.apache.commons.numbers.core.Precision;
 
 import java.time.Duration;
@@ -28,27 +32,60 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
     }
 
     @Override
-    public EstimationResult estimate(VMConfig vmConfig, Parameters parameters) {
+    public EstimationResult estimate(VMConfig vmConfig, Parameters parameters, DataCollector dataCollector) {
+        final var dataAmount = parameters.dataAmount();
+        var weights = parameters.programInfo.calculateWeights(parameters.testMachineResult, dataAmount);
+
+        weights.forEach((type, weight) -> dataCollector.collectData(CollectableData.format("Weight %s: %.5f", type.name(), weight)));
+
+        var ipcCalculator = new EstimationModel2.IpcCalculator.WeightedIpcCalculator(weights);
+
+        var ramUsage = parameters.programInfo().ramUsageModel().getFunction().applyAsDouble(dataAmount);
+
+        dataCollector.collectData(CollectableData.format("Ram Usage: %.2f mb", ramUsage / 1024));
+
+        if (vmConfig.benchmarkResult().availableMemoryKb() <= ramUsage)
+            dataCollector.collectData(new CollectableData.RamLimitExceeded(vmConfig.benchmarkResult().availableMemoryKb(), (long) ramUsage));
+
         var targetMachineBenchmarkResult = vmConfig.benchmarkResult();
         var targetMachineFreqKhz = targetMachineBenchmarkResult.efficientFreqKhz()[parameters.targetMachineCore]; // hz to c per ms
 
-        var appIpc = parameters.ipcCalculator.calculate(
+        dataCollector.collectData(CollectableData.format("Target Machine Freq Khz: %.5f", targetMachineFreqKhz));
+
+        var appIpcModel = BigOAnalysis.analyze(
+                parameters.programInfo.programTests().stream().mapToDouble(ProgramTestInfo::dataAmount).toArray(),
+                parameters.programInfo.programTests().stream().mapToDouble(ProgramTestInfo::appIpc).toArray()
+        );
+
+        dataCollector.collectData(CollectableData.format("App Ipc Model: %s", appIpcModel.formula()));
+
+        var testMachineAppIpc = appIpcModel.getFunction().applyAsDouble(dataAmount);
+
+        dataCollector.collectData(CollectableData.format("Test machine app Ipc: %.5f", testMachineAppIpc));
+
+        var appIpc = ipcCalculator.calculate(
                 parameters.testMachineResult,
                 vmConfig.benchmarkResult(),
                 parameters.testMachineCore,
                 parameters.targetMachineCore,
-                parameters.testMachineAppIpc
+                testMachineAppIpc
         );
+
+        dataCollector.collectData(CollectableData.format("Target machine app Ipc: %.5f", appIpc));
 
         var appComplexityFunc = parameters.programInfo.instructionModel().getFunction();
 
-        var instructions = appComplexityFunc.applyAsDouble(parameters.dataAmount);
+        var instructions = appComplexityFunc.applyAsDouble(dataAmount);
+
+        dataCollector.collectData(CollectableData.format("App total instructions: %.1f", instructions));
 
         var time = (long) (instructions / (targetMachineFreqKhz * appIpc));
 
+        dataCollector.collectData(CollectableData.format("Total time: %d ms", time));
+
         return new EstimationResult(
                 vmConfig,
-                Duration.ofMillis(time),
+                Duration.ofMillis(time < 0 ? 0 : time),
                 vmConfig.pricingPolicy()
         );
     }
@@ -120,8 +157,8 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
             VMBenchmarkResult testMachineResult,
             int testMachineCore,
             int targetMachineCore,
-            IpcCalculator ipcCalculator,
-            double testMachineAppIpc,
+//            IpcCalculator ipcCalculator,
+//            double testMachineAppIpc,
             long dataAmount
     ) {
     }

@@ -20,13 +20,13 @@ public record ProgramInfo(
         ComplexityModel cacheMissesModel,
         ComplexityModel dataReadModel,
         ComplexityModel timeModel,
+        ComplexityModel ramUsageModel,
         List<ProgramTestInfo> programTests,
         List<ProgramStructureDataRecord> programStructureDataList
 // just to save input data, not used for any calculations
 ) {
     // to see what app is using more
     public Map<IPCBenchmarkApp.Type, Double> calculateWeights(VMBenchmarkResult vmBenchmark, double dataAmount) {
-
         var cacheMisses = cacheMissesModel.getFunction().applyAsDouble(dataAmount);
         var dataRead = dataReadModel.getFunction().applyAsDouble(dataAmount);
         var instructions = instructionModel.getFunction().applyAsDouble(dataAmount) - (cacheMisses + dataRead);

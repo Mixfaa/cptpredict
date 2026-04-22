@@ -1,6 +1,8 @@
 package com.mixfa.cptpredict.ui;
 
-import com.mixfa.cptpredict.misc.BigOAnalysis;
+import com.mixfa.cptpredict.misc.datacollection.CollectableData;
+import com.mixfa.cptpredict.misc.datacollection.DataCollector;
+import com.mixfa.cptpredict.misc.datacollection.SimpleDataCollector;
 import com.mixfa.cptpredict.model.VMBenchmarkResult;
 import com.mixfa.cptpredict.model.VMConfig;
 import com.mixfa.cptpredict.model.estimation.EstimationModel;
@@ -12,8 +14,11 @@ import com.mixfa.cptpredict.service.EstimationModelManager;
 import com.mixfa.cptpredict.service.repo.CustomizableRepo;
 import com.mixfa.cptpredict.service.repo.RepoHolder;
 import com.mixfa.cptpredict.ui.components.BenchmarkResultCompRenderer;
+import com.mixfa.cptpredict.ui.components.BetterSpan;
+import com.mixfa.cptpredict.ui.components.DialogCloseButton;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Span;
@@ -21,10 +26,12 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.NumberField;
+import com.vaadin.flow.component.virtuallist.VirtualList;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.Route;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 
+import java.text.MessageFormat;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
@@ -44,7 +51,14 @@ public class PredictionsRoute extends BasicAppLayout {
         setContent(makeContent());
     }
 
-    private Component makePredictionForm(Set<VMConfig> vmConfigs, ProgramInfo programInfo, EstimationModel<?> estimationModel, Grid<EstimationResult> resultGrid) {
+    static record ResultAndData(
+            EstimationResult result,
+            DataCollector dataCollector,
+            ProgramInfo app
+    ) {
+    }
+
+    private Component makePredictionForm(Set<VMConfig> vmConfigs, ProgramInfo programInfo, EstimationModel<?> estimationModel, Grid<ResultAndData> resultGrid) {
         var formLayout = new FormLayout();
 
         switch (estimationModel) {
@@ -59,28 +73,23 @@ public class PredictionsRoute extends BasicAppLayout {
                 var getResultsButton = new Button("Get results", _ -> {
 
                     var benchmarkResult = benchmarkResultSelect.getValue();
-                    var ipcCalculator = new EstimationModel2.IpcCalculator.WeightedIpcCalculator(programInfo.calculateWeights(benchmarkResult, dataAmountField.getValue()));
-//                    var ipcCalculator = EstimationModel2.IpcCalculator.DefaultIpcCalculator.getInstance();
-                    var appIpcModel = BigOAnalysis.analyze(
-                            programInfo.programTests().stream().mapToDouble(ProgramTestInfo::dataAmount).toArray(),
-                            programInfo.programTests().stream().mapToDouble(ProgramTestInfo::appIpc).toArray()
-                    );
 
-                    var appIpc = appIpcModel.getFunction().applyAsDouble(dataAmountField.getValue());
-
-                    System.out.println("appIpc: " + appIpc);
                     var results = vmConfigs.stream().map(vmConfig -> {
+                        var dataCollector = new SimpleDataCollector();
+
                         var params = new EstimationModel2.Parameters(
                                 programInfo,
                                 benchmarkResult,
                                 benchmarkResult.highestFreqCore(),
                                 vmConfig.benchmarkResult().highestFreqCore(),
-                                ipcCalculator,
-                                appIpc,
                                 dataAmountField.getValue().longValue()
                         );
 
-                        return em2.estimate(vmConfig, params);
+                        return new ResultAndData(
+                                em2.estimate(vmConfig, params, dataCollector),
+                                dataCollector,
+                                programInfo
+                        );
                     }).toList();
 
                     resultGrid.setItems(results);
@@ -95,7 +104,7 @@ public class PredictionsRoute extends BasicAppLayout {
 
     private Component makePredictionUI(Set<VMConfig> vmConfig, EstimationModel<?> estimationModel) {
         final VerticalLayout uiLayout = new VerticalLayout();
-        final var resultGrid = new Grid<EstimationResult>();
+        final var resultGrid = new Grid<ResultAndData>();
 
         var appSelect = new Select<ProgramInfo>("Application");
         appSelect.setItemLabelGenerator(ProgramInfo::name);
@@ -106,15 +115,29 @@ public class PredictionsRoute extends BasicAppLayout {
             uiLayout.add(makePredictionForm(vmConfig, e.getValue(), estimationModel, resultGrid));
         });
 
-        resultGrid.addColumn(result -> result.targetVM().name()).setHeader("Target VM");
-        resultGrid.addColumn(result -> DurationFormatUtils.formatDurationWords(result.duration().toMillis(), true, true) + String.format("(%d sec)", result.duration().toSeconds()))
+        resultGrid.addColumn(result -> result.result.targetVM().name()).setHeader("Target VM");
+        resultGrid.addColumn(result -> DurationFormatUtils.formatDurationWords(result.result.duration().toMillis(), true, true) + String.format("(%d sec)", result.result.duration().toSeconds()))
                 .setHeader("Duration")
                 .setSortable(true)
-                .setComparator(Comparator.comparing(EstimationResult::duration));
-        resultGrid.addColumn(result -> result.bill().toPrettyString()).setHeader("Bill")
+                .setComparator(Comparator.comparing(result -> result.result.duration()));
+        resultGrid.addColumn(result -> result.result.bill().toPrettyString()).setHeader("Bill")
                 .setSortable(true)
-                .setComparator(Comparator.comparing(EstimationResult::bill));
+                .setComparator(Comparator.comparing(result -> result.result.bill()));
 
+        resultGrid.addComponentColumn(result -> new Button("Show intermediate data", _ -> {
+            new Dialog() {{
+                var list = new VirtualList<CollectableData>();
+                list.setSizeFull();
+                list.setItems(result.dataCollector.getResults());
+                list.setRenderer(CollectableData::display);
+                add(new BetterSpan(MessageFormat.format("App: {0}\nConfig: {1}", result.app.name(), result.result.targetVM().name())),list);
+                getFooter().add(new DialogCloseButton(this));
+                this.setWidth("400px");
+                this.setHeight("400px");
+            }}.open();
+        }));
+        resultGrid.addColumn(result -> result.dataCollector().getResults().stream().filter(it -> it instanceof CollectableData.RamLimitExceeded)
+                .findFirst().map(CollectableData::display).orElse("No ram limit exceeded")).setHeader("(ERROR) Ram usage exceeded");
         return new VerticalLayout(uiLayout, appSelect, resultGrid);
     }
 

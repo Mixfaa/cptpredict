@@ -2,6 +2,7 @@ package com.mixfa.cptpredict.service.impl;
 
 import com.mixfa.cptpredict.misc.CommandExecutor;
 import com.mixfa.cptpredict.misc.PythonCommands;
+import com.mixfa.cptpredict.misc.Utils;
 import com.mixfa.cptpredict.model.VMBenchmarkResult;
 import com.mixfa.cptpredict.model.benchmark.BenchmarkAppResult;
 import com.mixfa.cptpredict.model.benchmark.IPCBenchmarkApp;
@@ -39,42 +40,30 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
             new IPCBenchmarkApp("ipc_bench8", IPCBenchmarkApp.Type.DISK, 1075639543.0),
             new IPCBenchmarkApp("ipc_bench9", IPCBenchmarkApp.Type.DISK, 122448109.0)
     );
-    private static final String FREQ_BENCHMARK_WIN_AMD64 = "freq-benchmark-x86_64-pc-windows-gnu.exe";
-    private static final String FREQ_BENCHMARK_WIN_ARM64 = "freq-benchmark-aarch64-pc-windows-gnullvm.exe";
-    private static final String FREQ_BENCHMARK_LINUX_AMD64 = "freq-benchmark-x86_64-unknown-linux-gnu";
-    private static final String FREQ_BENCHMARK_LINUX_ARM64 = "freq-benchmark-aarch64-unknown-linux-gnu";
 
-    private static boolean isWindows(String os) {
-        return os.contains("windows");
-    }
+
+    private static final String FREQ_BENCHMARK = "freq-benchmark";
+    private static final String RAM_BENCHMARK = "ram_benchmark";
+//    private static final String FREQ_BENCHMARK_WIN_AMD64 = "freq-benchmark-x86_64-pc-windows-gnu.exe";
+//    private static final String FREQ_BENCHMARK_WIN_ARM64 = "freq-benchmark-aarch64-pc-windows-gnullvm.exe";
+//    private static final String FREQ_BENCHMARK_LINUX_AMD64 = "freq-benchmark-x86_64-unknown-linux-gnu";
+//    private static final String FREQ_BENCHMARK_LINUX_ARM64 = "freq-benchmark-aarch64-unknown-linux-gnu";
+
+//    private static boolean isWindows(String os) {
+//        return os.contains("windows");
+//    }
 
     private static boolean isLinux(String os) {
         return os.contains("linux");
     }
-
-    private static boolean isArm64(String arch) {
-        return arch.equals("arm64");
-    }
-
-    private static boolean isAmd64(String arch) {
-        return arch.equals("amd64") || arch.equals("x86_64");
-    }
-
-    public static String freqBenchmarkByOsArch(String os, String arch) {
-        if (isWindows(os)) {
-            if (isAmd64(arch))
-                return FREQ_BENCHMARK_WIN_AMD64;
-            else if (isArm64(arch))
-                return FREQ_BENCHMARK_WIN_ARM64;
-        } else if (isLinux(os)) {
-            if (isAmd64(arch))
-                return FREQ_BENCHMARK_LINUX_AMD64;
-            else if (isArm64(arch))
-                return FREQ_BENCHMARK_LINUX_ARM64;
-        }
-
-        throw new RuntimeException("Unsupported OS or Arch: " + os + " " + arch);
-    }
+//
+//    private static boolean isArm64(String arch) {
+//        return arch.equals("arm64");
+//    }
+//
+//    private static boolean isAmd64(String arch) {
+//        return arch.equals("amd64") || arch.equals("x86_64");
+//    }
 
     public static String getCpuName(boolean isLinux, PythonCommands pythonCommands, CommandExecutor commandExecutor) throws Exception {
         var cmd = isLinux ? pythonCommands.getCpuNameLinux() : pythonCommands.getCpuNameWindows();
@@ -96,6 +85,11 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
         return Double.parseDouble(output);
     }
 
+    private static long runAvailableRamBenchmark(String benchmarkDir, String os, String arch, CommandExecutor commandExecutor) throws Exception {
+        var availableRam = commandExecutor.executeCommand(benchmarkDir + Utils.executableName(RAM_BENCHMARK, os, arch));
+        return Long.parseLong(availableRam.trim());
+    }
+
     private static VMBenchmarkResult benchmarkMachine(CommandExecutor commandExecutor, PythonCommands pythonCommands, String benchmarksDir) throws Exception {
         var osArch = getOsArchSSH(pythonCommands, commandExecutor);
 
@@ -104,7 +98,8 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
 
         var cpuName = getCpuName(isLinux(os), pythonCommands, commandExecutor);
 
-        var freqData = runBenchmarkOld(benchmarksDir + freqBenchmarkByOsArch(os, arch), commandExecutor);
+        var availableRam = runAvailableRamBenchmark(benchmarksDir, os, arch, commandExecutor);
+        var freqData = runBenchmarkOld(benchmarksDir + Utils.executableName(FREQ_BENCHMARK, os, arch), commandExecutor);
 
         var cores = freqData.size();
         var frequencies = new double[cores];
@@ -129,7 +124,7 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
 
             results.add(new BenchmarkAppResult(benchmark, instrPerMs));
         }
-        return new VMBenchmarkResult(cpuName, cores, frequencies, results.toArray(BenchmarkAppResult[]::new));
+        return new VMBenchmarkResult(cpuName, cores, availableRam, frequencies, results.toArray(BenchmarkAppResult[]::new));
     }
 
     @Override
@@ -152,7 +147,8 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
                 .map(benchmarkApp -> Paths.get(BENCHMARKS_DIR_GLOBAL, benchmarkApp.executableName(os, arch)))
                 .collect(Collectors.toCollection(ArrayList::new));
 
-        benchmarks.add(Path.of(BENCHMARKS_DIR_GLOBAL + freqBenchmarkByOsArch(os, arch)));
+        benchmarks.add(Path.of(BENCHMARKS_DIR_GLOBAL + Utils.executableName(FREQ_BENCHMARK, os, arch)));
+        benchmarks.add(Path.of(BENCHMARKS_DIR_GLOBAL + Utils.executableName(RAM_BENCHMARK, os, arch)));
 
         return benchmarks;
     }
@@ -174,6 +170,7 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
                 var arch = osArch.getSecond();
 
                 var listOfFiles = makeBenchmarksList(os, arch);
+
 
                 // transfer files
                 var scpClientCreator = ScpClientCreator.instance();

@@ -10,7 +10,6 @@ import org.apache.commons.math3.util.FastMath;
 import java.util.List;
 
 public class BigOAnalysis {
-
     private static final List<ModelInfo> MODELS = List.of(
             // --- Зростаючі ---
             new ModelInfo(ComplexityModel.Type.O1),
@@ -20,7 +19,7 @@ public class BigOAnalysis {
             new ModelInfo(ComplexityModel.Type.ONlogN),
             new ModelInfo(ComplexityModel.Type.ONpow2),
             new ModelInfo(ComplexityModel.Type.ONpow3),
-            // --- Спадні (нові) ---
+            // --- Спадні  ---
             new ModelInfo(ComplexityModel.Type.O1overLogN),
             new ModelInfo(ComplexityModel.Type.O1overCbrtN),
             new ModelInfo(ComplexityModel.Type.O1overSqrtN),
@@ -66,7 +65,6 @@ public class BigOAnalysis {
 
         // Визначаємо, чи дані загалом спадають (для пріоритизації моделей)
         boolean isDecreasing = T[T.length - 1] < T[0];
-        double minT = StatUtils.min(T);
 
         WeightedObservedPoints points = new WeightedObservedPoints();
         for (int i = 0; i < N.length; i++) points.add(N[i], T[i]);
