@@ -157,8 +157,6 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
             VMBenchmarkResult testMachineResult,
             int testMachineCore,
             int targetMachineCore,
-//            IpcCalculator ipcCalculator,
-//            double testMachineAppIpc,
             long dataAmount
     ) {
     }

@@ -6,6 +6,4 @@ public interface DataCollector {
     void collectData(CollectableData data);
 
     List<CollectableData> getResults();
-
-
 }
