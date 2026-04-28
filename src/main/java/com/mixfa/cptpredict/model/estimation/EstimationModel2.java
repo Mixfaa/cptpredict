@@ -36,6 +36,14 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
         final var dataAmount = parameters.dataAmount();
         var weights = parameters.programInfo.calculateWeights(parameters.testMachineResult, dataAmount);
 
+        var instructions = parameters.programInfo.instructionModel().getFunction().applyAsDouble(dataAmount);
+        var cacheMisses = parameters.programInfo.cacheMissesModel().getFunction().applyAsDouble(dataAmount);
+        var diskIO = parameters.programInfo.dataReadModel().getFunction().applyAsDouble(dataAmount);
+
+        dataCollector.collectData(CollectableData.format("App total instructions: %.0f", instructions));
+        dataCollector.collectData(CollectableData.format("App total cache misses: %.0f", cacheMisses));
+        dataCollector.collectData(CollectableData.format("App total disk data read: %.0f", diskIO));
+
         weights.forEach((type, weight) -> dataCollector.collectData(CollectableData.format("Weight %s: %.5f", type.name(), weight)));
 
         var ipcCalculator = new EstimationModel2.IpcCalculator.WeightedIpcCalculator(weights);
@@ -72,12 +80,6 @@ public final class EstimationModel2 implements EstimationModel<EstimationModel2.
         );
 
         dataCollector.collectData(CollectableData.format("Target machine app Ipc: %.5f", appIpc));
-
-        var appComplexityFunc = parameters.programInfo.instructionModel().getFunction();
-
-        var instructions = appComplexityFunc.applyAsDouble(dataAmount);
-
-        dataCollector.collectData(CollectableData.format("App total instructions: %.1f", instructions));
 
         var time = (long) (instructions / (targetMachineFreqKhz * appIpc));
 

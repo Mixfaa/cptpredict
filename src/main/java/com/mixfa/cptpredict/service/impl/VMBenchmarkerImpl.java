@@ -38,7 +38,8 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
             new IPCBenchmarkApp("ipc_bench6", IPCBenchmarkApp.Type.RAM, 22368686340.0),
             new IPCBenchmarkApp("ipc_bench7", IPCBenchmarkApp.Type.RAM, 9462805294.0),
             new IPCBenchmarkApp("ipc_bench8", IPCBenchmarkApp.Type.DISK, 1075639543.0),
-            new IPCBenchmarkApp("ipc_bench9", IPCBenchmarkApp.Type.DISK, 122448109.0)
+            new IPCBenchmarkApp("ipc_bench9", IPCBenchmarkApp.Type.DISK, 122448109.0),
+            new IPCBenchmarkApp("ipc_bench10", IPCBenchmarkApp.Type.RAM, 34516108414.0)
     );
 
 
@@ -114,13 +115,14 @@ public class VMBenchmarkerImpl implements VMBenchmarker {
 
         var cycles = 3;
         for (IPCBenchmarkApp benchmark : BENCHMARKS) {
-            var totalTime = 0.0;
+            var bestTime = Double.MAX_VALUE;
             for (int j = 0; j < cycles; j++) {
-                totalTime += runIpcBenchmark(benchmark, os, arch, commandExecutor, benchmarksDir);
+                var time = runIpcBenchmark(benchmark, os, arch, commandExecutor, benchmarksDir);
+                if (time < bestTime)
+                    bestTime = time;
             }
-            var time = totalTime / cycles;
-            if (time == 0) time = 1; // are you running on nuke?
-            var instrPerMs = benchmark.testedInstructions() / time;
+            if (bestTime == 0) bestTime = 1; // are you running on nuke?
+            var instrPerMs = benchmark.testedInstructions() / bestTime;
 
             results.add(new BenchmarkAppResult(benchmark, instrPerMs));
         }
